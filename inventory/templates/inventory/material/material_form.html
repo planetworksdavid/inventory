@@ -1,0 +1,104 @@
+{% extends "inventory/base.html" %}
+{% load static %} {# Not strictly needed for this form, but good practice if JS is added later #}
+
+{% block title %}
+  {{ title }}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{{ title }}</h2>
+
+    <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+
+        {# Manual form rendering without crispy forms #}
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors|join:", " }}</div>
+        {% endif %}
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="{{ form.name.id_for_label }}" class="form-label">{{ form.name.label_tag }}</label>
+                {{ form.name }}
+                {% if form.name.errors %}<div class="invalid-feedback d-block">{{ form.name.errors|join:", " }}</div>{% endif %}
+                {% if form.name.help_text %}<small class="form-text text-muted">{{ form.name.help_text }}</small>{% endif %}
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="{{ form.sku.id_for_label }}" class="form-label">{{ form.sku.label_tag }}</label>
+                {{ form.sku }}
+                {% if form.sku.errors %}<div class="invalid-feedback d-block">{{ form.sku.errors|join:", " }}</div>{% endif %}
+                {% if form.sku.help_text %}<small class="form-text text-muted">{{ form.sku.help_text }}</small>{% endif %}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="{{ form.category.id_for_label }}" class="form-label">{{ form.category.label_tag }}</label>
+                {{ form.category }}
+                {% if form.category.errors %}<div class="invalid-feedback d-block">{{ form.category.errors|join:", " }}</div>{% endif %}
+                {% if form.category.help_text %}<small class="form-text text-muted">{{ form.category.help_text }}</small>{% endif %}
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="{{ form.manufacturer.id_for_label }}" class="form-label">{{ form.manufacturer.label_tag }}</label>
+                {{ form.manufacturer }}
+                {% if form.manufacturer.errors %}<div class="invalid-feedback d-block">{{ form.manufacturer.errors|join:", " }}</div>{% endif %}
+                {% if form.manufacturer.help_text %}<small class="form-text text-muted">{{ form.manufacturer.help_text }}</small>{% endif %}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="{{ form.vendor.id_for_label }}" class="form-label">{{ form.vendor.label_tag }}</label>
+                {{ form.vendor }}
+                {% if form.vendor.errors %}<div class="invalid-feedback d-block">{{ form.vendor.errors|join:", " }}</div>{% endif %}
+                {% if form.vendor.help_text %}<small class="form-text text-muted">{{ form.vendor.help_text }}</small>{% endif %}
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="{{ form.unit_of_measure.id_for_label }}" class="form-label">{{ form.unit_of_measure.label_tag }}</label>
+                {{ form.unit_of_measure }}
+                {% if form.unit_of_measure.errors %}<div class="invalid-feedback d-block">{{ form.unit_of_measure.errors|join:", " }}</div>{% endif %}
+                {% if form.unit_of_measure.help_text %}<small class="form-text text-muted">{{ form.unit_of_measure.help_text }}</small>{% endif %}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <label for="{{ form.quantity_on_hand.id_for_label }}" class="form-label">{{ form.quantity_on_hand.label_tag }}</label>
+                {{ form.quantity_on_hand }}
+                {% if form.quantity_on_hand.errors %}<div class="invalid-feedback d-block">{{ form.quantity_on_hand.errors|join:", " }}</div>{% endif %}
+                {% if form.quantity_on_hand.help_text %}<small class="form-text text-muted">{{ form.quantity_on_hand.help_text }}</small>{% endif %}
+            </div>
+            <div class="col-md-4 mb-3">
+                <label for="{{ form.low_quantity_threshold.id_for_label }}" class="form-label">{{ form.low_quantity_threshold.label_tag }}</label>
+                {{ form.low_quantity_threshold }}
+                {% if form.low_quantity_threshold.errors %}<div class="invalid-feedback d-block">{{ form.low_quantity_threshold.errors|join:", " }}</div>{% endif %}
+                {% if form.low_quantity_threshold.help_text %}<small class="form-text text-muted">{{ form.low_quantity_threshold.help_text }}</small>{% endif %}
+            </div>
+            <div class="col-md-4 mb-3">
+                <label for="{{ form.current_average_cost_per_unit.id_for_label }}" class="form-label">{{ form.current_average_cost_per_unit.label_tag }}</label>
+                {{ form.current_average_cost_per_unit }}
+                {% if form.current_average_cost_per_unit.errors %}<div class="invalid-feedback d-block">{{ form.current_average_cost_per_unit.errors|join:", " }}</div>{% endif %}
+                {% if form.current_average_cost_per_unit.help_text %}<small class="form-text text-muted">{{ form.current_average_cost_per_unit.help_text }}</small>{% endif %}
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label for="{{ form.image.id_for_label }}" class="form-label">{{ form.image.label_tag }}</label>
+            {{ form.image }}
+            {% if form.image.errors %}<div class="invalid-feedback d-block">{{ form.image.errors|join:", " }}</div>{% endif %}
+            {% if form.image.help_text %}<small class="form-text text-muted">{{ form.image.help_text }}</small>{% endif %}
+        </div>
+
+        <div class="mb-3">
+            <label for="{{ form.notes.id_for_label }}" class="form-label">{{ form.notes.label_tag }}</label>
+            {{ form.notes }}
+            {% if form.notes.errors %}<div class="invalid-feedback d-block">{{ form.notes.errors|join:", " }}</div>{% endif %}
+            {% if form.notes.help_text %}<small class="form-text text-muted">{{ form.notes.help_text }}</small>{% endif %}
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save Material</button>
+        <a href="{% url 'inventory:material_list' %}" class="btn btn-outline-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

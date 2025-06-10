@@ -1,0 +1,51 @@
+{% extends "inventory/base.html" %}
+
+{% block title %}
+  {{ title }}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{{ title }}</h2>
+
+    <a href="{% url 'inventory:material_request_create' %}" class="btn btn-primary mb-3">Create New Request</a>
+
+    {% if requests %}
+    <div class="list-group">
+        {% for req in requests %}
+        <div class="list-group-item list-group-item-action flex-column align-items-start mb-2">
+            <div class="d-flex w-100 justify-content-between">
+                <h5 class="mb-1">Request ID: {{ req.id }}</h5>
+                <small>Status: <span class="badge
+                    {% if req.status == 'PENDING' %}bg-warning text-dark{% endif %}
+                    {% if req.status == 'APPROVED' %}bg-info{% endif %}
+                    {% if req.status == 'COMPLETED' %}bg-success{% endif %}
+                    {% if req.status == 'CANCELLED' %}bg-danger{% endif %}
+                    ">{{ req.get_status_display }}</span></small>
+            </div>
+            <p class="mb-1"><strong>Date Required:</strong> {{ req.date_required|date:"Y-m-d" }}</p>
+            <p class="mb-1"><strong>Created:</strong> {{ req.created_at|date:"Y-m-d H:i" }}</p>
+            {% if req.justification %}
+                <p class="mb-1"><strong>Justification:</strong> {{ req.justification|truncatewords:30 }}</p>
+            {% endif %}
+
+            <h6>Items Requested:</h6>
+            <ul>
+                {% for item in req.request_items.all %}
+                <li>{{ item.quantity_requested }} x {{ item.material.name }} (SKU: {{ item.material.sku }})</li>
+                {% empty %}
+                <li>No items in this request.</li> {# Should not happen if formset requires items #}
+                {% endfor %}
+            </ul>
+            <small>Last updated: {{ req.updated_at|date:"Y-m-d H:i" }}</small>
+            {# Add link to view details if a separate detail page is created later #}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info" role="alert">
+        You have not made any material requests yet.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

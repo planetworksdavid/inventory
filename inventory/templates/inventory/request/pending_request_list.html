@@ -1,0 +1,50 @@
+{% extends "inventory/base.html" %}
+
+{% block title %}
+  {{ title }}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{{ title }}</h2>
+
+    {% if requests %}
+    <div class="list-group">
+        {% for req in requests %}
+        <div class="list-group-item list-group-item-action flex-column align-items-start mb-2">
+            <div class="d-flex w-100 justify-content-between">
+                <h5 class="mb-1">Request ID: {{ req.id }} by {{ req.requested_by.username }}</h5>
+                <small>Status: <span class="badge bg-warning text-dark">{{ req.get_status_display }}</span></small>
+            </div>
+            <p class="mb-1"><strong>Date Required:</strong> {{ req.date_required|date:"Y-m-d" }}</p>
+            <p class="mb-1"><strong>Created:</strong> {{ req.created_at|date:"Y-m-d H:i" }}</p>
+            {% if req.justification %}
+                <p class="mb-1"><strong>Justification:</strong> {{ req.justification|truncatewords:30 }}</p>
+            {% endif %}
+
+            <h6>Items Requested:</h6>
+            <ul class="list-unstyled">
+                {% for item in req.request_items.all %}
+                <li>
+                    {{ item.quantity_requested }} x {{ item.material.name }} (SKU: {{ item.material.sku }})
+                    <small class="text-muted">- Stock on hand: {{ item.material.quantity_on_hand }}</small>
+                </li>
+                {% empty %}
+                <li>No items listed for this request.</li>
+                {% endfor %}
+            </ul>
+
+            {# Link to the view that will handle completion. Pass request.id #}
+            <a href="{% url 'inventory:request_complete' request_id=req.id %}" class="btn btn-success btn-sm mt-2">Process & Complete Order</a>
+            {# Optionally, add a link to a detail view if more complex actions are needed before completion #}
+            {# <a href="#" class="btn btn-info btn-sm mt-2">View Details</a> #}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-success" role="alert">
+        There are no pending material requests at this time. Well done!
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

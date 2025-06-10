@@ -1,0 +1,57 @@
+{% extends "inventory/base.html" %}
+
+{% block title %}
+  {{ title }}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{{ title }}</h2>
+
+    {# Display messages if any (e.g., after completing an order) #}
+    {# This is now handled by base.html, but can be kept if specific placement is needed #}
+    {# {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    {% endif %} #}
+
+    {% if requests %}
+    <div class="list-group">
+        {% for req in requests %}
+        <div class="list-group-item list-group-item-action flex-column align-items-start mb-2">
+            <div class="d-flex w-100 justify-content-between">
+                <h5 class="mb-1">Request ID: {{ req.id }} by {{ req.requested_by.username }}</h5>
+                <small>Status: <span class="badge bg-success">{{ req.get_status_display }}</span></small>
+            </div>
+            <p class="mb-1"><strong>Date Required:</strong> {{ req.date_required|date:"Y-m-d" }}</p>
+            <p class="mb-1"><strong>Date Completed:</strong> {{ req.updated_at|date:"Y-m-d H:i" }}</p>
+            {% if req.justification %}
+                <p class="mb-1"><strong>Justification:</strong> {{ req.justification|truncatewords:30 }}</p>
+            {% endif %}
+
+            <h6>Items Fulfilled:</h6>
+            <ul class="list-unstyled">
+                {% for item in req.request_items.all %}
+                <li>
+                    {{ item.fulfilled_quantity }} x {{ item.material.name }} (SKU: {{ item.material.sku }})
+                </li>
+                {% empty %}
+                <li>No items listed for this request.</li>
+                {% endfor %}
+            </ul>
+            {# Optionally, add a link to view more details #}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info" role="alert">
+        There are no completed material requests to display.
+    </div>
+    {% endif %}
+     <a href="{% url 'inventory:pending_request_list' %}" class="btn btn-secondary mt-3">View Pending Requests</a>
+</div>
+{% endblock %}

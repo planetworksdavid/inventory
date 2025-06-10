@@ -1,0 +1,104 @@
+{% extends "inventory/base.html" %}
+{% load static %} {# If you add custom JS for formsets later #}
+
+{% block title %}
+  {{ title }}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{{ title }}</h2>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+
+        <h4>Request Details</h4>
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors|join:", " }}</div>
+        {% endif %}
+
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label for="{{ form.date_required.id_for_label }}" class="form-label">Date Required</label>
+                {{ form.date_required }}
+                {% if form.date_required.errors %}
+                    <div class="invalid-feedback d-block">{{ form.date_required.errors|join:", " }}</div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="mb-3">
+            <label for="{{ form.justification.id_for_label }}" class="form-label">Justification (Optional)</label>
+            {{ form.justification }}
+            {% if form.justification.errors %}
+                <div class="invalid-feedback d-block">{{ form.justification.errors|join:", " }}</div>
+            {% endif %}
+        </div>
+
+        <hr>
+        <h4>Requested Items</h4>
+
+        {{ formset.management_form }}
+        {% if formset.non_form_errors %}
+            <div class="alert alert-danger">{{ formset.non_form_errors|join:", " }}</div>
+        {% endif %}
+
+        <div id="item-forms-container">
+            {% for item_form in formset %}
+                <div class="item-form mb-3 p-3 border rounded">
+                    {% if item_form.non_field_errors %}
+                        <div class="alert alert-danger">{{ item_form.non_field_errors|join:", " }}</div>
+                    {% endif %}
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="{{ item_form.material.id_for_label }}" class="form-label">Material</label>
+                            {{ item_form.material }}
+                            {% if item_form.material.errors %}
+                                <div class="invalid-feedback d-block">{{ item_form.material.errors|join:", " }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-4">
+                            <label for="{{ item_form.quantity_requested.id_for_label }}" class="form-label">Quantity Requested</label>
+                            {{ item_form.quantity_requested }}
+                            {% if item_form.quantity_requested.errors %}
+                                <div class="invalid-feedback d-block">{{ item_form.quantity_requested.errors|join:", " }}</div>
+                            {% endif %}
+                        </div>
+                        {% if item_form.instance.pk and formset.can_delete %} {# Show delete only for existing forms #}
+                        <div class="col-md-2 align-self-end">
+                            <div class="form-check">
+                                {{ item_form.DELETE }}
+                                <label class="form-check-label" for="{{ item_form.DELETE.id_for_label }}">Delete</label>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {{ item_form.id }} {# Hidden field for existing item ID #}
+                </div>
+            {% endfor %}
+        </div>
+
+        {# Add JavaScript to dynamically add more item forms if desired #}
+        {# <button type="button" id="add-item-form" class="btn btn-secondary btn-sm mb-3">Add Another Item</button> #}
+
+
+        <button type="submit" class="btn btn-primary">Submit Request</button>
+        <a href="{% url 'inventory:material_list' %}" class="btn btn-outline-secondary">Cancel</a>
+    </form>
+</div>
+
+{# Basic script to handle adding more forms - for advanced use, consider django-dynamic-formset #}
+{#
+<script>
+// Simple add formset item - needs improvement for production
+// document.getElementById('add-item-form').addEventListener('click', function() {
+//     var formsetContainer = document.getElementById('item-forms-container');
+//     var totalFormsInput = document.querySelector('input[name="items-TOTAL_FORMS"]');
+//     var newFormHtml = formsetContainer.children[0].outerHTML.replace(/items-\d-/g, 'items-' + totalFormsInput.value + '-');
+//     var newFormElement = document.createElement('div');
+//     newFormElement.innerHTML = newFormHtml;
+//     formsetContainer.appendChild(newFormElement.firstChild);
+//     totalFormsInput.value = parseInt(totalFormsInput.value) + 1;
+// });
+</script>
+#}
+{% endblock %}
