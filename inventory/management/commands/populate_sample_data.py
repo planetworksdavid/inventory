@@ -107,7 +107,7 @@ class Command(BaseCommand):
                 request1 = MaterialRequest.objects.create(
                     requested_by=crew_user,
                     date_required=timezone.now().date() + timezone.timedelta(days=7),
-                    status=MaterialRequest.Status.PENDING,
+                    status=MaterialRequest.Status.REQUESTED, # Changed from PENDING
                     justification='For upcoming Project X'
                 )
                 MaterialRequestItem.objects.create(material_request=request1, material=created_materials_for_requests[0], quantity_requested=10)

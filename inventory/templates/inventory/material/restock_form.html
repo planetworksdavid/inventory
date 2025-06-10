@@ -1,0 +1,56 @@
+{% extends "inventory/base.html" %}
+
+{% block title %}
+  {{ title }}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{{ title }}</h2>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors|join:", " }}</div>
+        {% endif %}
+
+        <div class="mb-3">
+            <label for="{{ form.material.id_for_label }}" class="form-label">{{ form.material.label_tag }}</label>
+            {{ form.material }}
+            {% if form.material.errors %}<div class="invalid-feedback d-block">{{ form.material.errors|join:", " }}</div>{% endif %}
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="{{ form.quantity_change.id_for_label }}" class="form-label">{{ form.quantity_change.label_tag }}</label>
+                {{ form.quantity_change }}
+                {% if form.quantity_change.errors %}<div class="invalid-feedback d-block">{{ form.quantity_change.errors|join:", " }}</div>{% endif %}
+            </div>
+        </div>
+
+        <p class="form-text text-muted">Please provide either 'Cost Per Unit' or 'Total Cost' for this transaction.</p>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="{{ form.cost_per_unit_at_transaction.id_for_label }}" class="form-label">{{ form.cost_per_unit_at_transaction.label_tag }}</label>
+                {{ form.cost_per_unit_at_transaction }}
+                {% if form.cost_per_unit_at_transaction.errors %}<div class="invalid-feedback d-block">{{ form.cost_per_unit_at_transaction.errors|join:", " }}</div>{% endif %}
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="{{ form.total_cost_of_transaction.id_for_label }}" class="form-label">{{ form.total_cost_of_transaction.label_tag }}</label>
+                {{ form.total_cost_of_transaction }}
+                {% if form.total_cost_of_transaction.errors %}<div class="invalid-feedback d-block">{{ form.total_cost_of_transaction.errors|join:", " }}</div>{% endif %}
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label for="{{ form.notes.id_for_label }}" class="form-label">{{ form.notes.label_tag }}</label>
+            {{ form.notes }}
+            {% if form.notes.errors %}<div class="invalid-feedback d-block">{{ form.notes.errors|join:", " }}</div>{% endif %}
+        </div>
+
+        <button type="submit" class="btn btn-primary">Record Restock</button>
+        <a href="{% url 'inventory:material_list' %}" class="btn btn-outline-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

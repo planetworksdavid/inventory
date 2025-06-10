@@ -15,19 +15,19 @@ class VendorAdmin(admin.ModelAdmin):
 class MaterialAdmin(admin.ModelAdmin):
     list_display = (
         'name', 'sku', 'category', 'vendor', 'quantity_on_hand',
-        'unit_of_measure', 'low_quantity_threshold', 'current_average_cost_per_unit'
+        'unit_of_measure', 'low_quantity_threshold', 'current_average_cost_per_unit', 'updated_at'
     )
     list_filter = ('category', 'vendor', 'manufacturer')
     search_fields = ('name', 'sku', 'manufacturer')
-    readonly_fields = ('created_at', 'updated_at')
+    readonly_fields = ('created_at', 'updated_at', 'quantity_on_hand', 'current_average_cost_per_unit') # Added quantity and cost
     fieldsets = (
         (None, {
             'fields': ('name', 'sku', 'category', 'manufacturer', 'vendor')
         }),
-        ('Stock Details', {
+        ('Stock Details', { # quantity_on_hand is now readonly
             'fields': ('unit_of_measure', 'quantity_on_hand', 'low_quantity_threshold')
         }),
-        ('Financials', {
+        ('Financials', { # current_average_cost_per_unit is now readonly
             'fields': ('current_average_cost_per_unit',)
         }),
         ('Media', {

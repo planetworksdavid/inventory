@@ -37,8 +37,12 @@
                 <li>No items in this request.</li> {# Should not happen if formset requires items #}
                 {% endfor %}
             </ul>
-            <small>Last updated: {{ req.updated_at|date:"Y-m-d H:i" }}</small>
-            {# Add link to view details if a separate detail page is created later #}
+
+                {% if req.status == 'REQUESTED' %}
+                    <a href="{% url 'inventory:material_request_edit' request_id=req.id %}" class="btn btn-outline-secondary btn-sm mt-2">Edit</a>
+                    <a href="{% url 'inventory:material_request_cancel' request_id=req.id %}" class="btn btn-outline-danger btn-sm mt-2 ms-1">Cancel</a>
+                {% endif %}
+                <small class="d-block mt-1 text-muted">Last updated: {{ req.updated_at|date:"Y-m-d H:i" }}</small>
         </div>
         {% endfor %}
     </div>

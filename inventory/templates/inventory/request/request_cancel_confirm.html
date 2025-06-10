@@ -1,0 +1,20 @@
+{% extends "inventory/base.html" %}
+
+{% block title %}
+  {{ title }}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{{ title }}</h2>
+
+    <p>Are you sure you want to cancel Material Request ID: <strong>{{ request_to_cancel.id }}</strong>?</p>
+    <p>This action cannot be undone.</p>
+
+    <form method="post" action="{% url 'inventory:material_request_cancel' request_id=request_to_cancel.id %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Yes, Cancel Request</button>
+        <a href="{% url 'inventory:crew_request_list' %}" class="btn btn-outline-secondary">No, Go Back</a>
+    </form>
+</div>
+{% endblock %}

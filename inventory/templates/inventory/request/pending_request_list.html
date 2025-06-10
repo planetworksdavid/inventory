@@ -8,13 +8,21 @@
 <div class="container mt-4">
     <h2>{{ title }}</h2>
 
+    {# Messages will be displayed by base.html #}
+
     {% if requests %}
     <div class="list-group">
         {% for req in requests %}
         <div class="list-group-item list-group-item-action flex-column align-items-start mb-2">
             <div class="d-flex w-100 justify-content-between">
                 <h5 class="mb-1">Request ID: {{ req.id }} by {{ req.requested_by.username }}</h5>
-                <small>Status: <span class="badge bg-warning text-dark">{{ req.get_status_display }}</span></small>
+                <small>Status: <span class="badge
+                    {% if req.status == 'REQUESTED' %}bg-primary
+                    {% elif req.status == 'IN_PROCESS' %}bg-info text-dark
+                    {% elif req.status == 'COMPLETED' %}bg-success
+                    {% elif req.status == 'CANCELLED' %}bg-danger
+                    {% else %}bg-secondary{% endif %}
+                    ">{{ req.get_status_display }}</span></small>
             </div>
             <p class="mb-1"><strong>Date Required:</strong> {{ req.date_required|date:"Y-m-d" }}</p>
             <p class="mb-1"><strong>Created:</strong> {{ req.created_at|date:"Y-m-d H:i" }}</p>
@@ -34,16 +42,24 @@
                 {% endfor %}
             </ul>
 
-            {# Link to the view that will handle completion. Pass request.id #}
-            <a href="{% url 'inventory:request_complete' request_id=req.id %}" class="btn btn-success btn-sm mt-2">Process & Complete Order</a>
-            {# Optionally, add a link to a detail view if more complex actions are needed before completion #}
-            {# <a href="#" class="btn btn-info btn-sm mt-2">View Details</a> #}
+            {% if req.status == 'REQUESTED' %}
+                <form method="post" action="{% url 'inventory:request_start_processing' request_id=req.id %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-info btn-sm mt-2">Start Processing</button>
+                </form>
+                {# Kept "Mark as Directly Completed" for now as per instructions, though a stricter flow might remove it #}
+                <a href="{% url 'inventory:request_complete' request_id=req.id %}" class="btn btn-success btn-sm mt-2 ms-1">Mark as Directly Completed</a>
+            {% elif req.status == 'IN_PROCESS' %}
+                 {# This page currently only shows REQUESTED items, so this block might not be reached unless view changes #}
+                 <a href="{% url 'inventory:request_complete' request_id=req.id %}" class="btn btn-success btn-sm mt-2">Mark as Completed</a>
+                 <span class="ms-2 fst-italic">Order is being processed.</span>
+            {% endif %}
         </div>
         {% endfor %}
     </div>
     {% else %}
-    <div class="alert alert-success" role="alert">
-        There are no pending material requests at this time. Well done!
+    <div class="alert alert-info" role="alert">
+        There are no material requests awaiting processing at this time.
     </div>
     {% endif %}
 </div>

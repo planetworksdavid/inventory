@@ -63,25 +63,42 @@
         </div>
 
         <div class="row">
-            <div class="col-md-4 mb-3">
-                <label for="{{ form.quantity_on_hand.id_for_label }}" class="form-label">{{ form.quantity_on_hand.label_tag }}</label>
-                {{ form.quantity_on_hand }}
-                {% if form.quantity_on_hand.errors %}<div class="invalid-feedback d-block">{{ form.quantity_on_hand.errors|join:", " }}</div>{% endif %}
-                {% if form.quantity_on_hand.help_text %}<small class="form-text text-muted">{{ form.quantity_on_hand.help_text }}</small>{% endif %}
-            </div>
-            <div class="col-md-4 mb-3">
+            {# low_quantity_threshold remains a direct Material field #}
+            <div class="col-md-6 mb-3">
                 <label for="{{ form.low_quantity_threshold.id_for_label }}" class="form-label">{{ form.low_quantity_threshold.label_tag }}</label>
                 {{ form.low_quantity_threshold }}
                 {% if form.low_quantity_threshold.errors %}<div class="invalid-feedback d-block">{{ form.low_quantity_threshold.errors|join:", " }}</div>{% endif %}
                 {% if form.low_quantity_threshold.help_text %}<small class="form-text text-muted">{{ form.low_quantity_threshold.help_text }}</small>{% endif %}
             </div>
+        </div>
+
+    {% if not material_instance %} {# Only show these fields for new material creation #}
+        <hr>
+        <h5>Initial Stock Details</h5>
+        <div class="row">
             <div class="col-md-4 mb-3">
-                <label for="{{ form.current_average_cost_per_unit.id_for_label }}" class="form-label">{{ form.current_average_cost_per_unit.label_tag }}</label>
-                {{ form.current_average_cost_per_unit }}
-                {% if form.current_average_cost_per_unit.errors %}<div class="invalid-feedback d-block">{{ form.current_average_cost_per_unit.errors|join:", " }}</div>{% endif %}
-                {% if form.current_average_cost_per_unit.help_text %}<small class="form-text text-muted">{{ form.current_average_cost_per_unit.help_text }}</small>{% endif %}
+                <label for="{{ form.initial_quantity.id_for_label }}" class="form-label">{{ form.initial_quantity.label_tag }}</label>
+                {{ form.initial_quantity }}
+                {% if form.initial_quantity.errors %}<div class="invalid-feedback d-block">{{ form.initial_quantity.errors|join:", " }}</div>{% endif %}
+                {% if form.initial_quantity.help_text %}<small class="form-text text-muted">{{ form.initial_quantity.help_text }}</small>{% endif %}
             </div>
         </div>
+        <p class="form-text text-muted">If initial quantity is greater than zero, please provide either 'Total Cost' or 'Cost Per Unit' for the initial stock.</p>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="{{ form.initial_total_cost.id_for_label }}" class="form-label">{{ form.initial_total_cost.label_tag }}</label>
+                {{ form.initial_total_cost }}
+                {% if form.initial_total_cost.errors %}<div class="invalid-feedback d-block">{{ form.initial_total_cost.errors|join:", " }}</div>{% endif %}
+                {% if form.initial_total_cost.help_text %}<small class="form-text text-muted">{{ form.initial_total_cost.help_text }}</small>{% endif %}
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="{{ form.initial_cost_per_unit.id_for_label }}" class="form-label">{{ form.initial_cost_per_unit.label_tag }}</label>
+                {{ form.initial_cost_per_unit }}
+                {% if form.initial_cost_per_unit.errors %}<div class="invalid-feedback d-block">{{ form.initial_cost_per_unit.errors|join:", " }}</div>{% endif %}
+                {% if form.initial_cost_per_unit.help_text %}<small class="form-text text-muted">{{ form.initial_cost_per_unit.help_text }}</small>{% endif %}
+            </div>
+        </div>
+    {% endif %}
 
         <div class="mb-3">
             <label for="{{ form.image.id_for_label }}" class="form-label">{{ form.image.label_tag }}</label>

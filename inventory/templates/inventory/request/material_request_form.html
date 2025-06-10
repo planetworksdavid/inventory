@@ -81,8 +81,10 @@
         {# <button type="button" id="add-item-form" class="btn btn-secondary btn-sm mb-3">Add Another Item</button> #}
 
 
-        <button type="submit" class="btn btn-primary">Submit Request</button>
-        <a href="{% url 'inventory:material_list' %}" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+                {% if material_request_instance %}Update Request{% else %}Submit Request{% endif %}
+            </button>
+            <a href="{% url 'inventory:crew_request_list' %}" class="btn btn-outline-secondary">Cancel</a> {# Changed cancel to go to crew_request_list #}
     </form>
 </div>
 
