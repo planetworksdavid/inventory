@@ -1,5 +1,5 @@
 {% extends "inventory/base.html" %}
-{% load static %} {# If you add custom JS for formsets later #}
+{% load static %}
 
 {% block title %}
   {{ title }}
@@ -19,7 +19,7 @@
 
         <div class="row mb-3">
             <div class="col-md-6">
-                <label for="{{ form.date_required.id_for_label }}" class="form-label">Date Required</label>
+                <label for="{{ form.date_required.id_for_label }}" class="form-label">{{ form.date_required.label_tag }}</label>
                 {{ form.date_required }}
                 {% if form.date_required.errors %}
                     <div class="invalid-feedback d-block">{{ form.date_required.errors|join:", " }}</div>
@@ -27,7 +27,7 @@
             </div>
         </div>
         <div class="mb-3">
-            <label for="{{ form.justification.id_for_label }}" class="form-label">Justification (Optional)</label>
+            <label for="{{ form.justification.id_for_label }}" class="form-label">{{ form.justification.label_tag }}</label>
             {{ form.justification }}
             {% if form.justification.errors %}
                 <div class="invalid-feedback d-block">{{ form.justification.errors|join:", " }}</div>
@@ -48,59 +48,181 @@
                     {% if item_form.non_field_errors %}
                         <div class="alert alert-danger">{{ item_form.non_field_errors|join:", " }}</div>
                     {% endif %}
-                    <div class="row">
-                        <div class="col-md-6">
-                            <label for="{{ item_form.material.id_for_label }}" class="form-label">Material</label>
+                    <div class="row align-items-end"> {# Use align-items-end for button alignment #}
+                        <div class="col-md-5"> {# Adjusted col size #}
+                            <label for="{{ item_form.material.id_for_label }}" class="form-label">{{ item_form.material.label_tag }}</label>
                             {{ item_form.material }}
                             {% if item_form.material.errors %}
                                 <div class="invalid-feedback d-block">{{ item_form.material.errors|join:", " }}</div>
                             {% endif %}
                         </div>
-                        <div class="col-md-4">
-                            <label for="{{ item_form.quantity_requested.id_for_label }}" class="form-label">Quantity Requested</label>
+                        <div class="col-md-4"> {# Adjusted col size #}
+                            <label for="{{ item_form.quantity_requested.id_for_label }}" class="form-label">{{ item_form.quantity_requested.label_tag }}</label>
                             {{ item_form.quantity_requested }}
                             {% if item_form.quantity_requested.errors %}
                                 <div class="invalid-feedback d-block">{{ item_form.quantity_requested.errors|join:", " }}</div>
                             {% endif %}
                         </div>
-                        {% if item_form.instance.pk and formset.can_delete %} {# Show delete only for existing forms #}
-                        <div class="col-md-2 align-self-end">
-                            <div class="form-check">
+                        <div class="col-md-3 text-end"> {# Adjusted col size and alignment #}
+                            {% if item_form.instance.pk and formset.can_delete %}
+                            <div class="form-check mb-2"> {# Added margin for spacing #}
                                 {{ item_form.DELETE }}
-                                <label class="form-check-label" for="{{ item_form.DELETE.id_for_label }}">Delete</label>
+                                <label class="form-check-label" for="{{ item_form.DELETE.id_for_label }}">Delete this item</label>
                             </div>
+                            {% else %}
+                                 <button type="button" class="btn btn-danger btn-sm remove-item-form">Remove</button>
+                            {% endif %}
                         </div>
-                        {% endif %}
                     </div>
                     {{ item_form.id }} {# Hidden field for existing item ID #}
                 </div>
             {% endfor %}
         </div>
 
-        {# Add JavaScript to dynamically add more item forms if desired #}
-        {# <button type="button" id="add-item-form" class="btn btn-secondary btn-sm mb-3">Add Another Item</button> #}
+        <button type="button" id="add-item-form" class="btn btn-secondary btn-sm mb-3">Add Another Item</button>
 
-
-            <button type="submit" class="btn btn-primary">
-                {% if material_request_instance %}Update Request{% else %}Submit Request{% endif %}
-            </button>
-            <a href="{% url 'inventory:crew_request_list' %}" class="btn btn-outline-secondary">Cancel</a> {# Changed cancel to go to crew_request_list #}
+        <hr class="mt-4">
+        <button type="submit" class="btn btn-primary">
+            {% if material_request_instance %}Update Request{% else %}Submit Request{% endif %}
+        </button>
+        <a href="{% url 'inventory:crew_request_list' %}" class="btn btn-outline-secondary">Cancel</a>
     </form>
 </div>
 
-{# Basic script to handle adding more forms - for advanced use, consider django-dynamic-formset #}
-{#
+<div id="empty-form-template" style="display: none;">
+    {% if formset.empty_form %}
+    <div class="item-form mb-3 p-3 border rounded">
+        {% if formset.empty_form.non_field_errors %}
+            <div class="alert alert-danger">{{ formset.empty_form.non_field_errors|join:", " }}</div>
+        {% endif %}
+        <div class="row align-items-end">
+            <div class="col-md-5">
+                <label for="{{ formset.empty_form.material.id_for_label }}" class="form-label">{{ formset.empty_form.material.label_tag }}</label>
+                {{ formset.empty_form.material }}
+                {% if formset.empty_form.material.errors %}
+                    <div class="invalid-feedback d-block">{{ formset.empty_form.material.errors|join:", " }}</div>
+                {% endif %}
+            </div>
+            <div class="col-md-4">
+                <label for="{{ formset.empty_form.quantity_requested.id_for_label }}" class="form-label">{{ formset.empty_form.quantity_requested.label_tag }}</label>
+                {{ formset.empty_form.quantity_requested }}
+                {% if formset.empty_form.quantity_requested.errors %}
+                    <div class="invalid-feedback d-block">{{ formset.empty_form.quantity_requested.errors|join:", " }}</div>
+                {% endif %}
+            </div>
+            <div class="col-md-3 text-end">
+                 <button type="button" class="btn btn-danger btn-sm remove-item-form">Remove</button>
+            </div>
+        </div>
+        {{ formset.empty_form.id }}
+    </div>
+    {% endif %}
+</div>
+
+
 <script>
-// Simple add formset item - needs improvement for production
-// document.getElementById('add-item-form').addEventListener('click', function() {
-//     var formsetContainer = document.getElementById('item-forms-container');
-//     var totalFormsInput = document.querySelector('input[name="items-TOTAL_FORMS"]');
-//     var newFormHtml = formsetContainer.children[0].outerHTML.replace(/items-\d-/g, 'items-' + totalFormsInput.value + '-');
-//     var newFormElement = document.createElement('div');
-//     newFormElement.innerHTML = newFormHtml;
-//     formsetContainer.appendChild(newFormElement.firstChild);
-//     totalFormsInput.value = parseInt(totalFormsInput.value) + 1;
-// });
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.getElementById('item-forms-container');
+    const addButton = document.getElementById('add-item-form');
+    const totalFormsInput = document.querySelector('input[name="{{ formset.prefix }}-TOTAL_FORMS"]');
+    const initialFormsInput = document.querySelector('input[name="{{ formset.prefix }}-INITIAL_FORMS"]');
+
+    let formTemplateHtml = '';
+    const emptyFormContainer = document.getElementById('empty-form-template');
+    if (emptyFormContainer && emptyFormContainer.firstElementChild) {
+        formTemplateHtml = emptyFormContainer.firstElementChild.outerHTML;
+    } else if (container.children.length > 0) { // Fallback to cloning the first visible form if empty_form isn't setup
+        formTemplateHtml = container.children[0].outerHTML;
+    }
+
+
+    addButton.addEventListener('click', function() {
+        if (!formTemplateHtml) {
+            // Try to grab template again if it wasn't available on DOMContentLoaded
+            // (e.g. if formset was empty and no empty_form_template div was used)
+            if (container.children.length > 0) {
+                 formTemplateHtml = container.children[0].outerHTML;
+            } else {
+                console.error("No form template found to clone. Ensure formset.empty_form is rendered in a hidden div with id 'empty-form-template' or formset has extra > 0.");
+                alert("Cannot add new item: form template missing.");
+                return;
+            }
+        }
+
+        let formNum = parseInt(totalFormsInput.value); // Next form index is current total
+
+        let newFormHtml = formTemplateHtml.replace(/__prefix__/g, formNum);
+        // Also replace for attributes that might use underscores if default form renderer does that for empty_form
+        newFormHtml = newFormHtml.replace(new RegExp( `{{ formset.prefix }}_${formNum}_` , 'g'), `{{ formset.prefix }}-${formNum}-`);
+
+
+        let tempDiv = document.createElement('div');
+        tempDiv.innerHTML = newFormHtml;
+        let newFormElement = tempDiv.firstElementChild;
+
+        // Clear values from cloned form
+        newFormElement.querySelectorAll('input, select, textarea').forEach(input => {
+            if (input.type !== 'hidden' && input.type !== 'button' && input.type !== 'submit' && input.name && !input.name.includes('FORMS')) {
+                if (input.type === 'checkbox' || input.type === 'radio') {
+                    input.checked = false;
+                } else if (input.tagName === 'SELECT') {
+                    input.selectedIndex = 0;
+                } else {
+                    input.value = '';
+                }
+            }
+            // Remove ID field from cloned new forms
+            if (input.name && input.name.endsWith('-id')) {
+                input.value = '';
+            }
+            // Ensure DELETE is not checked (it shouldn't exist on empty_form template, but good practice)
+            if (input.name && input.name.endsWith('-DELETE')) {
+                input.checked = false;
+            }
+        });
+
+        // Ensure new forms always get a "Remove" button, not a "DELETE" checkbox
+        // This is handled by the empty_form_template having the remove button.
+        // If cloning an existing form that had a DELETE checkbox, it's replaced.
+        let deleteCheckboxDiv = newFormElement.querySelector('.form-check');
+        if (deleteCheckboxDiv && deleteCheckboxDiv.querySelector('input[name$="-DELETE"]')) {
+            let buttonContainer = newFormElement.querySelector('.col-md-3.text-end');
+            if (buttonContainer) {
+                buttonContainer.innerHTML = '<button type="button" class="btn btn-danger btn-sm remove-item-form">Remove</button>';
+            }
+        }
+
+
+        container.appendChild(newFormElement);
+        totalFormsInput.value = formNum + 1;
+
+        attachRemoveListeners();
+    });
+
+    function attachRemoveListeners() {
+        container.querySelectorAll('.remove-item-form').forEach(button => {
+            button.removeEventListener('click', handleRemoveClick);
+            button.addEventListener('click', handleRemoveClick);
+        });
+    }
+
+    function handleRemoveClick(event) {
+        const itemForm = event.target.closest('.item-form');
+        if (itemForm) {
+            // For forms that were part of initial data (have an ID and DELETE checkbox)
+            const deleteInput = itemForm.querySelector('input[name$="-DELETE"]');
+            if (deleteInput) {
+                deleteInput.checked = true;
+                itemForm.style.display = 'none'; // Hide it, server will process deletion
+            } else {
+                // For newly added forms (no DELETE input), just remove from DOM.
+                // Django's formset processing can handle gaps if TOTAL_FORMS is an overestimate.
+                // No need to decrement TOTAL_FORMS here, could lead to issues if not careful.
+                itemForm.remove();
+            }
+        }
+    }
+    attachRemoveListeners(); // Initial attachment for forms already on page
+});
 </script>
-#}
 {% endblock %}

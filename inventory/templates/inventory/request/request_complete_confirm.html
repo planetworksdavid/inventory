@@ -8,76 +8,81 @@
 <div class="container mt-4">
     <h2>{{ title }}</h2>
 
-    {# Display Django messages if they exist #}
+    {# Display messages from Django messages framework, if any (e.g., from a redirect) #}
     {% if messages %}
         {% for message in messages %}
-            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
         {% endfor %}
     {% endif %}
 
-    {% if error_message and not messages %} {# Show error_message if passed specifically and not already shown by Django messages #}
+    {# Display error message passed directly in context (e.g., from a failed POST attempt on this view) #}
+    {% if error_message and not messages %} {# Avoid double-displaying if message framework also caught it #}
         <div class="alert alert-danger" role="alert">
             {{ error_message }}
         </div>
     {% endif %}
 
-    {% if request_to_complete %}
-        {% if request_to_complete.status == 'PENDING' or error_message %} {# Only show form if pending or if there was an error on POST #}
-            <div class="card mb-3">
-                <div class="card-header">
-                    Request Details (ID: {{ request_to_complete.id }})
-                </div>
-                <div class="card-body">
-                    <p><strong>Requested by:</strong> {{ request_to_complete.requested_by.username }}</p>
-                    <p><strong>Date Required:</strong> {{ request_to_complete.date_required|date:"Y-m-d" }}</p>
-                    <p><strong>Status:</strong> <span class="badge
-                        {% if request_to_complete.status == 'PENDING' %}bg-warning text-dark
-                        {% elif request_to_complete.status == 'APPROVED' %}bg-info
-                        {% elif request_to_complete.status == 'COMPLETED' %}bg-success
-                        {% elif request_to_complete.status == 'CANCELLED' %}bg-danger
-                        {% else %}bg-secondary{% endif %}
-                        ">{{ request_to_complete.get_status_display }}</span></p>
-                    {% if request_to_complete.justification %}
-                        <p><strong>Justification:</strong> {{ request_to_complete.justification }}</p>
-                    {% endif %}
-
-                    <h5>Items:</h5>
-                    <ul class="list-group">
-                        {% for item in request_to_complete.request_items.all %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            {{ item.quantity_requested }} x {{ item.material.name }} (SKU: {{ item.material.sku }})
-                            <span class="badge bg-secondary rounded-pill">
-                                On Hand: {{ item.material.quantity_on_hand }}
-                            </span>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                </div>
+    {# Check if the request object exists and is in a completable state, or if there was an error on POST #}
+    {% if request_to_complete and (request_to_complete.status == 'REQUESTED' or request_to_complete.status == 'IN_PROCESS' or error_message) %}
+        <div class="card mb-3">
+            <div class="card-header">
+                Request Details (ID: {{ request_to_complete.id }})
             </div>
+            <div class="card-body">
+                <p><strong>Requested by:</strong> {{ request_to_complete.requested_by.username }}</p>
+                <p><strong>Date Required:</strong> {{ request_to_complete.date_required|date:"Y-m-d" }}</p>
+                <p><strong>Status:</strong> <span class="badge
+                    {% if request_to_complete.status == 'REQUESTED' %}bg-primary{% endif %}
+                    {% if request_to_complete.status == 'IN_PROCESS' %}bg-info text-dark{% endif %}
+                    {# This page primarily deals with REQUESTED or IN_PROCESS, COMPLETED is handled by redirect #}
+                    ">{{ request_to_complete.get_status_display }}</span></p>
+                {% if request_to_complete.justification %}
+                    <p><strong>Justification:</strong> {{ request_to_complete.justification }}</p>
+                {% endif %}
 
-            {# Avoid showing completion form if there was a stock error that prevents completion #}
-            {% if not error_message or "Insufficient stock" not in error_message|default:"" %}
-                <form method="post" action="{% url 'inventory:request_complete' request_id=request_to_complete.id %}">
-                    {% csrf_token %}
-                    <p>Are you sure you want to mark this request as completed? This will deduct the item quantities from the inventory.</p>
-                    <button type="submit" class="btn btn-success">Confirm Completion</button>
-                    <a href="{% url 'inventory:pending_request_list' %}" class="btn btn-outline-secondary">Cancel</a>
-                </form>
-            {% else %}
-                 <a href="{% url 'inventory:pending_request_list' %}" class="btn btn-primary">Return to Pending Requests</a>
-            {% endif %}
-
-        {% elif request_to_complete.status == 'COMPLETED' %}
-             <div class="alert alert-info" role="alert">
-                This request has already been completed.
+                <h5>Items:</h5>
+                <ul class="list-group">
+                    {% for item in request_to_complete.request_items.all %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        {{ item.quantity_requested }} x {{ item.material.name }} (SKU: {{ item.material.sku }})
+                        <span class="badge bg-secondary rounded-pill">
+                            On Hand: {{ item.material.quantity_on_hand }}
+                        </span>
+                    </li>
+                    {% endfor %}
+                </ul>
             </div>
-            <a href="{% url 'inventory:pending_request_list' %}" class="btn btn-primary">Back to Pending Requests</a>
+        </div>
+
+        {# Show confirmation form only if not an unrecoverable stock error from a POST #}
+        {# The error_message might be a generic one, so also check specific content if needed #}
+        {% if not error_message or "Insufficient stock" not in error_message|default:"" %}
+        <form method="post" action="{% url 'inventory:request_complete' request_id=request_to_complete.id %}">
+            {% csrf_token %}
+            <p>Are you sure you want to mark this request as completed? This will deduct the item quantities from the inventory.</p>
+            <button type="submit" class="btn btn-success">Confirm Completion</button>
+            <a href="{% url 'inventory:pending_request_list' %}" class="btn btn-outline-secondary">Cancel</a>
+        </form>
+        {% else %}
+             {# If there was an "Insufficient stock" error, just provide a way back #}
+             <a href="{% url 'inventory:pending_request_list' %}" class="btn btn-primary">Return to Pending Requests</a>
         {% endif %}
-    {% else %}
+
+    {% elif request_to_complete and request_to_complete.status == 'COMPLETED' %}
+         <div class="alert alert-info" role="alert">
+            This request has already been completed.
+        </div>
+        <a href="{% url 'inventory:pending_request_list' %}" class="btn btn-primary">Back to Pending Requests</a>
+    {% elif request_to_complete %} {# Other non-completable statuses like CANCELLED #}
         <div class="alert alert-warning" role="alert">
+            This request is in status '{{ request_to_complete.get_status_display }}' and cannot be directly completed.
+        </div>
+        <a href="{% url 'inventory:pending_request_list' %}" class="btn btn-primary">Back to Pending Requests</a>
+    {% else %} {# request_to_complete is None #}
+        <div class="alert alert-danger" role="alert">
             Request details could not be loaded.
         </div>
          <a href="{% url 'inventory:pending_request_list' %}" class="btn btn-primary">Return to Pending Requests</a>

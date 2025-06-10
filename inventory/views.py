@@ -210,14 +210,13 @@ def crew_request_list_view(request):
 @login_required
 @user_passes_test(is_warehouse_staff, login_url='inventory:login')
 def pending_request_list_view(request):
-    # Now filters for 'REQUESTED' status specifically for this list.
-    pending_requests = MaterialRequest.objects.filter(status=MaterialRequest.Status.REQUESTED) \
-                                           .select_related('requested_by') \
-                                           .prefetch_related('request_items__material') \
-                                           .order_by('date_required', 'created_at')
+    pending_requests = MaterialRequest.objects.filter(
+        status__in=[MaterialRequest.Status.REQUESTED, MaterialRequest.Status.IN_PROCESS]
+    ).select_related('requested_by').prefetch_related('request_items__material').order_by('date_required', 'created_at')
+
     context = {
         'requests': pending_requests,
-        'title': 'Pending Material Requests (Awaiting Processing)' # Updated title
+        'title': 'Pending & In Process Material Requests' # Updated title
     }
     return render(request, 'inventory/request/pending_request_list.html', context)
 

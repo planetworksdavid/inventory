@@ -17,10 +17,11 @@
             <div class="d-flex w-100 justify-content-between">
                 <h5 class="mb-1">Request ID: {{ req.id }}</h5>
                 <small>Status: <span class="badge
-                    {% if req.status == 'PENDING' %}bg-warning text-dark{% endif %}
-                    {% if req.status == 'APPROVED' %}bg-info{% endif %}
+                    {% if req.status == 'REQUESTED' %}bg-primary{% endif %}
+                    {% if req.status == 'IN_PROCESS' %}bg-info text-dark{% endif %}
                     {% if req.status == 'COMPLETED' %}bg-success{% endif %}
                     {% if req.status == 'CANCELLED' %}bg-danger{% endif %}
+                    {% if req.status == 'PENDING' %}bg-warning text-dark{% endif %} {# Fallback for any old data #}
                     ">{{ req.get_status_display }}</span></small>
             </div>
             <p class="mb-1"><strong>Date Required:</strong> {{ req.date_required|date:"Y-m-d" }}</p>
