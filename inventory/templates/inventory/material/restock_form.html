@@ -16,8 +16,14 @@
         {% endif %}
 
         <div class="mb-3">
+            <label for="{{ form.category_filter.id_for_label }}" class="form-label">{{ form.category_filter.label_tag }}</label>
+            {{ form.category_filter }}
+            {% if form.category_filter.errors %}<div class="invalid-feedback d-block">{{ form.category_filter.errors|join:", " }}</div>{% endif %}
+        </div>
+
+        <div class="mb-3">
             <label for="{{ form.material.id_for_label }}" class="form-label">{{ form.material.label_tag }}</label>
-            {{ form.material }}
+            {{ form.material }} {# This will be the select2 widget #}
             {% if form.material.errors %}<div class="invalid-feedback d-block">{{ form.material.errors|join:", " }}</div>{% endif %}
         </div>
 
@@ -53,4 +59,56 @@
         <a href="{% url 'inventory:material_list' %}" class="btn btn-outline-secondary">Cancel</a>
     </form>
 </div>
+
+{% block additional_scripts %}
+<script type="text/javascript">
+document.addEventListener('DOMContentLoaded', function() {
+    // Ensure jQuery is loaded if Select2 depends on it and it's not globally available
+    // For django-select2, its own JS assets should handle initialization.
+    // The $ symbol below implies jQuery.
+    if (typeof $ === 'undefined') {
+        console.warn("jQuery not loaded, Select2 dependent filtering might not work as expected if using jQuery specific features.");
+        // Potentially load jQuery here if absolutely necessary and not handled by form.media
+        // return;
+    }
+
+    const categoryFilter = document.getElementById('{{ form.category_filter.id_for_label }}'); // Get ID from form field
+    const materialSelect = $('#{{ form.material.id_for_label }}'); // jQuery selector for Select2
+
+    if (categoryFilter && materialSelect.length) { // Check if materialSelect (jQuery object) found any elements
+        categoryFilter.addEventListener('change', function() {
+            const selectedCategoryId = this.value;
+            let currentDataUrl = "{% url 'inventory:material_ajax_search' %}"; // Base URL
+
+            if (selectedCategoryId) {
+                currentDataUrl += "?category_id=" + selectedCategoryId;
+            }
+
+            // Update data-ajax--url for Select2
+            materialSelect.attr('data-ajax--url', currentDataUrl);
+
+            // Clear current selection in Select2 and trigger change to re-fetch
+            materialSelect.val(null).trigger('change');
+
+            // For some versions/setups of Select2, you might need to reinitialize or explicitly open/close
+            // to force it to use the new URL immediately.
+            // Example:
+            // if (materialSelect.data('select2')) {
+            //    materialSelect.select2('destroy');
+            //    materialSelect.select2({
+            //        ajax: { url: currentDataUrl, dataType: 'json', /* other select2 ajax options */ },
+            //        placeholder: materialSelect.attr('data-placeholder'),
+            //        allowClear: true // if you want a clear button
+            //        // theme: 'bootstrap-5' // if using a bootstrap theme
+            //    });
+            // }
+            // However, django-select2 is supposed to handle this by observing the data-ajax--url attribute.
+            // If issues persist, the above destroy/re-init is a more forceful approach.
+        });
+    } else {
+        if (!categoryFilter) console.warn("Category filter dropdown not found for dependent Select2 script.");
+        if (!materialSelect.length) console.warn("Material Select2 dropdown not found for dependent Select2 script.");
+    }
+});
+</script>
 {% endblock %}

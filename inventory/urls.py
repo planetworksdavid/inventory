@@ -27,4 +27,6 @@ urlpatterns = [
     path('warehouse/materials/new/', views.material_create_view, name='material_create'),
     path('warehouse/materials/<int:material_id>/update/', views.material_update_view, name='material_update'),
     path('warehouse/materials/restock/', views.material_restock_view, name='material_restock'),
+    # AJAX Search URL for Select2
+    path('ajax/material_search/', views.MaterialAjaxSearch.as_view(), name='material_ajax_search'),
 ]

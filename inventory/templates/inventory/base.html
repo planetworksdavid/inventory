@@ -5,10 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Inventory Management{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    {# Add form media CSS #}
+    {% if form %}{{ form.media.css }}{% endif %}
+    {% if formset %}{{ formset.media.css }}{% endif %}
     <style>
         body { padding-top: 70px; /* Adjusted for fixed navbar height */ }
         .invalid-feedback.d-block { display: block; }
         .navbar-nav .nav-item { margin-left: 0.5em; }
+        /* Add any select2 specific global overrides here if needed later */
     </style>
 </head>
 <body>
@@ -94,5 +98,8 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {# Add form media JS #}
+    {% if form %}{{ form.media.js }}{% endif %}
+    {% if formset %}{{ formset.media.js }}{% endif %}
 </body>
 </html>

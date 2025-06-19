@@ -8,6 +8,10 @@ from django.db.models import Q, F # Import F object
 from django.contrib import messages # For user feedback
 from django.utils import timezone # Ensure timezone is imported
 from django.http import HttpResponseForbidden # For access control
+from django_select2.views import AutoResponseView # For select2 AJAX view
+from django_select2.forms import ModelSelect2Widget # For select2 form widget
+from django.urls import reverse_lazy # For data_url in widget
+from django import forms # For forms.NumberInput
 
 from .forms import LoginForm, MaterialRequestForm, MaterialForm, StockTransactionForm
 from .models import Material, MaterialRequest, MaterialRequestItem, MaterialCategory, Vendor, StockTransaction
@@ -69,7 +73,15 @@ def material_request_create_view(request):
         fields=('material', 'quantity_requested'),
         extra=1,
         can_delete=True,
-        widgets={'material': Select(attrs={'class': 'form-control'})}
+        widgets={
+            'material': ModelSelect2Widget(
+                model=Material,
+                search_fields=['name__icontains', 'sku__icontains'],
+                attrs={'data-placeholder': 'Search for a material...', 'style': 'width: 100%;'},
+                data_url=reverse_lazy('inventory:material_ajax_search')
+            ),
+            'quantity_requested': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'})
+        }
     )
 
     if request.method == 'POST':
@@ -157,7 +169,15 @@ def material_request_edit_view(request, request_id):
         fields=('material', 'quantity_requested'),
         extra=1,
         can_delete=True, # Allow items to be deleted
-        widgets={'material': Select(attrs={'class': 'form-control'})}
+        widgets={
+            'material': ModelSelect2Widget(
+                model=Material,
+                search_fields=['name__icontains', 'sku__icontains'],
+                attrs={'data-placeholder': 'Search for a material...', 'style': 'width: 100%;'},
+                data_url=reverse_lazy('inventory:material_ajax_search')
+            ),
+            'quantity_requested': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'})
+        }
     )
 
     if request.method == 'POST':
@@ -364,6 +384,34 @@ def material_create_view(request):
         # 'material_instance' is not passed for create view, so template condition will work
     }
     return render(request, 'inventory/material/material_form.html', context)
+
+
+# AJAX view for material search with django-select2
+class MaterialAjaxSearch(AutoResponseView):
+    def get_queryset(self):
+        qs = Material.objects.all().order_by('name')
+
+        category_id = self.request.GET.get('category_id', None)
+        if category_id:
+            try:
+                # Ensure category_id is a valid integer before filtering
+                qs = qs.filter(category_id=int(category_id))
+            except ValueError:
+                # Optionally, handle invalid category_id (e.g., log or return empty qs)
+                # For now, we'll let it pass, effectively ignoring invalid category_id
+                pass
+
+        if self.term:
+            qs = qs.filter(Q(name__icontains=self.term) | Q(sku__icontains=self.term))
+        return qs
+
+    # Optional: Customize how results are displayed in the dropdown
+    # def get_result_label(self, item):
+    #     return f"{item.name} (SKU: {item.sku})"
+
+    # Optional: Customize the value that is submitted
+    # def get_result_value(self, item):
+    #     return str(item.pk)
 
 
 @login_required

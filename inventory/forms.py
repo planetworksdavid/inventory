@@ -1,6 +1,8 @@
 from django import forms
 from decimal import Decimal # Import Decimal
-from .models import MaterialRequest, Material, StockTransaction # Add StockTransaction
+from django.urls import reverse_lazy
+from django_select2.forms import ModelSelect2Widget, Select2Widget # Add Select2Widget
+from .models import MaterialRequest, Material, StockTransaction, MaterialCategory # Add MaterialCategory
 
 # ... (LoginForm and MaterialRequestForm remain) ...
 class LoginForm(forms.Form):
@@ -124,15 +126,37 @@ class StockTransactionForm(forms.ModelForm):
         widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
     )
 
+    category_filter = forms.ModelChoiceField(
+        queryset=MaterialCategory.objects.all().order_by('name'),
+        required=False,
+        label="Filter by Category",
+        widget=Select2Widget(attrs={'data-placeholder': 'All Categories', 'style': 'width: 100%;', 'class': 'form-control'})
+    )
+    cost_per_unit_at_transaction = forms.DecimalField(
+        max_digits=10, decimal_places=2, required=False,
+        label="Cost Per Unit (for this transaction)",
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
+    )
+    total_cost_of_transaction = forms.DecimalField(
+        max_digits=12, decimal_places=2, required=False,
+        label="Total Cost (for this transaction)",
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
+    )
+
     class Meta:
         model = StockTransaction
         fields = [
-            'material', 'quantity_change',
+            'category_filter', 'material', 'quantity_change',
             'cost_per_unit_at_transaction', 'total_cost_of_transaction',
             'notes'
         ]
         widgets = {
-            'material': forms.Select(attrs={'class': 'form-select'}),
+            'material': ModelSelect2Widget(
+                model=Material,
+                search_fields=['name__icontains', 'sku__icontains'],
+                attrs={'data-placeholder': 'Search for a material by name or SKU...', 'style': 'width: 100%;'},
+                data_url=reverse_lazy('inventory:material_ajax_search')
+            ),
             'quantity_change': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Positive value for additions'}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
@@ -141,9 +165,9 @@ class StockTransactionForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
-        self.user = kwargs.pop('user', None) # For created_by
+        self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
-        self.fields['material'].queryset = Material.objects.order_by('name') # Order materials alphabetically
+        # No longer need to set self.fields['material'].queryset here for Select2 with data_url
 
     def clean_quantity_change(self):
         quantity = self.cleaned_data.get('quantity_change')

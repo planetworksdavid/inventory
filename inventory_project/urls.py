@@ -6,6 +6,7 @@ from django.conf.urls.static import static # For media files
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('inventory/', include('inventory.urls', namespace='inventory')),
+    path('select2/', include('django_select2.urls')), # Add this line for django-select2
     # Potentially a root path redirecting to inventory or a dashboard later
     # path('', some_view_for_root_path, name='home'),
 ]

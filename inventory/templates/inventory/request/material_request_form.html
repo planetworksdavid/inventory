@@ -17,6 +17,13 @@
             <div class="alert alert-danger">{{ form.non_field_errors|join:", " }}</div>
         {% endif %}
 
+        {# Category filter for all items in formset #}
+        <div class="mb-3">
+            <label for="{{ form.category_filter.id_for_label }}" class="form-label">{{ form.category_filter.label_tag }}</label>
+            {{ form.category_filter }}
+            {% if form.category_filter.errors %}<div class="invalid-feedback d-block">{{ form.category_filter.errors|join:", " }}</div>{% endif %}
+        </div>
+
         <div class="row mb-3">
             <div class="col-md-6">
                 <label for="{{ form.date_required.id_for_label }}" class="form-label">{{ form.date_required.label_tag }}</label>
@@ -122,6 +129,33 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Main Category Filter for all material select2 in formset
+    const mainCategoryFilter = document.getElementById('{{ form.category_filter.id_for_label }}'); // Use ID from rendered field
+    if (mainCategoryFilter && typeof $ !== 'undefined') { // Ensure jQuery is available for $(...)
+        mainCategoryFilter.addEventListener('change', function() {
+            const selectedCategoryId = this.value;
+            let baseDataUrl = "{% url 'inventory:material_ajax_search' %}";
+            let newDataUrl = baseDataUrl;
+
+            if (selectedCategoryId) {
+                newDataUrl += "?category_id=" + selectedCategoryId;
+            }
+
+            document.querySelectorAll('.item-form select[name$="-material"]').forEach(function(materialSelectElement) {
+                const materialSelect = $(materialSelectElement); // jQuery for Select2
+                if (materialSelect.data('select2')) { // Check if select2 is initialized
+                    materialSelect.val(null).trigger('change');
+                    materialSelect.attr('data-ajax--url', newDataUrl);
+                    // django-select2 should ideally pick this up.
+                }
+            });
+        });
+    } else if (typeof $ === 'undefined') {
+        console.warn("jQuery not loaded, Select2 dependent filtering for material request items might not work.");
+    }
+
+
+    // Formset Add/Remove logic (existing script continues below)
     const container = document.getElementById('item-forms-container');
     const addButton = document.getElementById('add-item-form');
     const totalFormsInput = document.querySelector('input[name="{{ formset.prefix }}-TOTAL_FORMS"]');
