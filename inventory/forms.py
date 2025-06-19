@@ -14,41 +14,24 @@ class MaterialRequestForm(forms.ModelForm):
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
         required=True
     )
+    category_filter = forms.ModelChoiceField(
+        queryset=MaterialCategory.objects.all().order_by('name'),
+        required=False,
+        label="Filter Items by Category (for search below)",
+        widget=Select2Widget(attrs={'data-placeholder': 'All Categories', 'style': 'width: 100%;', 'class': 'form-control'})
+    )
+    date_required = forms.DateField(
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        required=True
+    )
     class Meta:
         model = MaterialRequest
-        fields = ['date_required', 'justification']
+        fields = ['category_filter', 'date_required', 'justification']
         widgets = {
             'justification': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
         }
 
 class MaterialForm(forms.ModelForm):
-    class Meta:
-        model = Material
-        fields = [
-            'name', 'sku', 'manufacturer', 'category', 'vendor',
-            'unit_of_measure', 'quantity_on_hand',
-            'low_quantity_threshold', 'current_average_cost_per_unit',
-            'image', 'notes'
-        ]
-        widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'sku': forms.TextInput(attrs={'class': 'form-control'}),
-            'manufacturer': forms.TextInput(attrs={'class': 'form-control'}),
-            'category': forms.Select(attrs={'class': 'form-select'}),
-            'vendor': forms.Select(attrs={'class': 'form-select'}),
-            'unit_of_measure': forms.TextInput(attrs={'class': 'form-control'}),
-            'quantity_on_hand': forms.NumberInput(attrs={'class': 'form-control'}),
-            'low_quantity_threshold': forms.NumberInput(attrs={'class': 'form-control'}),
-            'current_average_cost_per_unit': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'image': forms.ClearableFileInput(attrs={'class': 'form-control'}),
-            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-        }
-        help_texts = { # Optional: Add or override help texts if needed
-            'quantity_on_hand': 'Initial quantity when adding a new material.'
-        }
-
-    # Note: quantity_on_hand and current_average_cost_per_unit are now set by StockTransaction
-    # The form needs fields to capture the *initial* stock and its cost.
     initial_quantity = forms.IntegerField(
         min_value=0, required=True, label="Initial Quantity on Hand",
         widget=forms.NumberInput(attrs={'class': 'form-control'}),
@@ -69,20 +52,17 @@ class MaterialForm(forms.ModelForm):
 
     class Meta:
         model = Material
-        # Exclude quantity_on_hand and current_average_cost_per_unit
         fields = [
             'name', 'sku', 'manufacturer', 'category', 'vendor',
             'unit_of_measure', 'low_quantity_threshold',
             'image', 'notes',
-            # New fields for initial stock are handled by the form, not directly on model here
         ]
-        # Widgets for model fields remain, new fields handled above
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'sku': forms.TextInput(attrs={'class': 'form-control'}),
             'manufacturer': forms.TextInput(attrs={'class': 'form-control'}),
-            'category': forms.Select(attrs={'class': 'form-select'}),
-            'vendor': forms.Select(attrs={'class': 'form-select'}),
+            'category': forms.Select(attrs={'class': 'form-select'}), # Standard select, can be Select2Widget if needed
+            'vendor': forms.Select(attrs={'class': 'form-select'}),   # Standard select
             'unit_of_measure': forms.TextInput(attrs={'class': 'form-control'}),
             'low_quantity_threshold': forms.NumberInput(attrs={'class': 'form-control'}),
             'image': forms.ClearableFileInput(attrs={'class': 'form-control'}),
@@ -117,27 +97,61 @@ class StockTransactionForm(forms.ModelForm):
     # Providing one of these should be enough, the model's save method can derive the other.
     cost_per_unit_at_transaction = forms.DecimalField(
         max_digits=10, decimal_places=2, required=False,
-        label="Cost Per Unit (for this transaction)",
-        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
-    )
-    total_cost_of_transaction = forms.DecimalField(
-        max_digits=12, decimal_places=2, required=False,
-        label="Total Cost (for this transaction)",
-        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
-    )
-
-    category_filter = forms.ModelChoiceField(
-        queryset=MaterialCategory.objects.all().order_by('name'),
-        required=False,
         label="Filter by Category",
         widget=Select2Widget(attrs={'data-placeholder': 'All Categories', 'style': 'width: 100%;', 'class': 'form-control'})
     )
-    cost_per_unit_at_transaction = forms.DecimalField(
-        max_digits=10, decimal_places=2, required=False,
-        label="Cost Per Unit (for this transaction)",
-        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
-    )
-    total_cost_of_transaction = forms.DecimalField(
+    # cost_per_unit_at_transaction and total_cost_of_transaction are already defined above,
+    # and correctly set as required=False.
+    # They will be included in Meta.fields.
+    # No need to redefine them here.
+
+    class Meta:
+        model = StockTransaction
+        fields = [
+            'category_filter', 'material', 'quantity_change',
+            'cost_per_unit_at_transaction', 'total_cost_of_transaction',
+            'notes'
+        ]
+        widgets = {
+            'material': ModelSelect2Widget(
+                model=Material,
+                search_fields=['name__icontains', 'sku__icontains'],
+                attrs={'data-placeholder': 'Search for a material by name or SKU...', 'style': 'width: 100%;'},
+                data_url=reverse_lazy('inventory:material_ajax_search')
+            ),
+            'quantity_change': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Positive value for additions'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+        labels = {
+            'quantity_change': 'Quantity Added/Changed',
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        # No longer need to set self.fields['material'].queryset here for Select2 with data_url
+
+    def clean_quantity_change(self):
+        quantity = self.cleaned_data.get('quantity_change')
+        # For this form, assuming it's for RESTOCK or INITIAL, so quantity must be positive.
+        # The model's save method has stronger checks based on transaction_type.
+        if quantity is not None and quantity <= 0:
+            raise forms.ValidationError("Quantity must be positive for a restock.")
+        return quantity
+
+    def clean(self):
+        cleaned_data = super().clean()
+        cost_per_unit = cleaned_data.get('cost_per_unit_at_transaction')
+        total_cost = cleaned_data.get('total_cost_of_transaction')
+
+        if cost_per_unit is None and total_cost is None:
+            raise forms.ValidationError("Please provide either 'Cost Per Unit' or 'Total Cost' for the transaction.")
+        if cost_per_unit is not None and cost_per_unit < 0:
+            self.add_error('cost_per_unit_at_transaction', "Cost per unit cannot be negative.")
+        if total_cost is not None and total_cost < 0:
+            self.add_error('total_cost_of_transaction', "Total cost cannot be negative.")
+
+        return cleaned_data
         max_digits=12, decimal_places=2, required=False,
         label="Total Cost (for this transaction)",
         widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
