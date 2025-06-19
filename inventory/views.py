@@ -388,30 +388,35 @@ def material_create_view(request):
 
 # AJAX view for material search with django-select2
 class MaterialAjaxSearch(AutoResponseView):
+    def get_field(self): # Override to bypass field loading if not needed
+        return None
+
     def get_queryset(self):
         qs = Material.objects.all().order_by('name')
 
         category_id = self.request.GET.get('category_id', None)
         if category_id:
             try:
-                # Ensure category_id is a valid integer before filtering
+                # Ensure category_id is an integer before filtering
                 qs = qs.filter(category_id=int(category_id))
             except ValueError:
-                # Optionally, handle invalid category_id (e.g., log or return empty qs)
-                # For now, we'll let it pass, effectively ignoring invalid category_id
+                # Invalid category_id, ignore or handle as error
+                # For now, ignoring to return results not filtered by invalid category
                 pass
 
-        if self.term:
+        if self.term: # self.term is the search term from select2
             qs = qs.filter(Q(name__icontains=self.term) | Q(sku__icontains=self.term))
-        return qs
 
-    # Optional: Customize how results are displayed in the dropdown
-    # def get_result_label(self, item):
-    #     return f"{item.name} (SKU: {item.sku})"
+        # Limit results to avoid sending too much data, e.g., first 25-50
+        return qs[:50] # Example limit
 
-    # Optional: Customize the value that is submitted
+    # Optional: Customize result label if default (str(model_instance)) is not ideal
+    def get_result_label(self, item):
+        return f"{item.name} (SKU: {item.sku})"
+
+    # Optional: Customize result value (usually item.pk)
     # def get_result_value(self, item):
-    #     return str(item.pk)
+    #     return str(item.pk) # Default is usually fine
 
 
 @login_required
