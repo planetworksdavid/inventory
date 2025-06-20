@@ -120,84 +120,116 @@
 </div>
 
 
-<script>
+{% block additional_scripts %}
+<script type="text/javascript">
 document.addEventListener('DOMContentLoaded', function() {
-    // Main Category Filter JavaScript removed.
-
-    // Formset Add/Remove logic (existing script continues below)
     const container = document.getElementById('item-forms-container');
     const addButton = document.getElementById('add-item-form');
     const totalFormsInput = document.querySelector('input[name="{{ formset.prefix }}-TOTAL_FORMS"]');
-    const initialFormsInput = document.querySelector('input[name="{{ formset.prefix }}-INITIAL_FORMS"]');
+    const emptyFormTemplate = document.getElementById('empty-form-template');
 
+    // Function to initialize Select2 on a given select element
+    function initializeSelect2(selectElement) {
+        if (selectElement && typeof $ !== 'undefined' && !$(selectElement).data('select2')) { // Check if jQuery available and not already initialized
+            $(selectElement).select2({
+                ajax: {
+                    url: "{% url 'inventory:material_ajax_search' %}", // Ensure this URL is correct
+                    dataType: 'json',
+                    delay: 250, // Wait 250ms after typing before searching
+                    data: function (params) {
+                        return {
+                            term: params.term, // search term
+                            page: params.page
+                        };
+                    },
+                    processResults: function (data, params) {
+                        params.page = params.page || 1;
+                        return {
+                            results: data.results, // Assuming your AJAX view returns data in {results: [...]} format
+                            pagination: {
+                                more: data.pagination && data.pagination.more // Assuming pagination info
+                            }
+                        };
+                    },
+                    cache: true
+                },
+                placeholder: 'Search for a material...',
+                minimumInputLength: 0, // Trigger AJAX on focus to get initial list
+                width: '100%',
+                allowClear: true
+            });
+        } else if (typeof $ === 'undefined') {
+             console.warn("jQuery not loaded. Select2 cannot be initialized for material request items.");
+        }
+    }
+
+    // Initialize Select2 on existing forms (rendered by Django)
+    container.querySelectorAll('.item-form select[name$="-material"]').forEach(function(select) {
+        initializeSelect2(select);
+    });
+
+    // Formset Add/Remove logic
     let formTemplateHtml = '';
-    const emptyFormContainer = document.getElementById('empty-form-template');
-    if (emptyFormContainer && emptyFormContainer.firstElementChild) {
-        formTemplateHtml = emptyFormContainer.firstElementChild.outerHTML;
-    } else if (container.children.length > 0) { // Fallback to cloning the first visible form if empty_form isn't setup
-        formTemplateHtml = container.children[0].outerHTML;
+    if (emptyFormTemplate && emptyFormTemplate.innerHTML.trim()) {
+        formTemplateHtml = emptyFormTemplate.innerHTML;
+    } else if (container.children.length > 0) {
+        formTemplateHtml = container.children[0].outerHTML; // Fallback
     }
 
 
     addButton.addEventListener('click', function() {
         if (!formTemplateHtml) {
-            // Try to grab template again if it wasn't available on DOMContentLoaded
-            // (e.g. if formset was empty and no empty_form_template div was used)
-            if (container.children.length > 0) {
+            if (container.children.length > 0) { // Try to grab template again
                  formTemplateHtml = container.children[0].outerHTML;
             } else {
-                console.error("No form template found to clone. Ensure formset.empty_form is rendered in a hidden div with id 'empty-form-template' or formset has extra > 0.");
+                console.error("No form template found to clone.");
                 alert("Cannot add new item: form template missing.");
                 return;
             }
         }
 
-        let formNum = parseInt(totalFormsInput.value); // Next form index is current total
-
+        let formNum = parseInt(totalFormsInput.value);
         let newFormHtml = formTemplateHtml.replace(/__prefix__/g, formNum);
-        // Also replace for attributes that might use underscores if default form renderer does that for empty_form
-        newFormHtml = newFormHtml.replace(new RegExp( `{{ formset.prefix }}_${formNum}_` , 'g'), `{{ formset.prefix }}-${formNum}-`);
-
 
         let tempDiv = document.createElement('div');
         tempDiv.innerHTML = newFormHtml;
         let newFormElement = tempDiv.firstElementChild;
 
-        // Clear values from cloned form
+        if (!newFormElement) {
+            console.error("Cloned form structure is invalid from template:", formTemplateHtml);
+            return;
+        }
+
+        // Clear values
         newFormElement.querySelectorAll('input, select, textarea').forEach(input => {
             if (input.type !== 'hidden' && input.type !== 'button' && input.type !== 'submit' && input.name && !input.name.includes('FORMS')) {
-                if (input.type === 'checkbox' || input.type === 'radio') {
-                    input.checked = false;
-                } else if (input.tagName === 'SELECT') {
-                    input.selectedIndex = 0;
+                if (input.type === 'checkbox' || input.type === 'radio') input.checked = false;
+                else if (input.tagName === 'SELECT') {
+                    // For select2, clearing and re-initializing is better than just setting selectedIndex
+                    if ($(input).data('select2')) { // If it was a select2 already in template
+                        $(input).val(null).trigger('change');
+                    } else {
+                        input.selectedIndex = 0;
+                    }
                 } else {
                     input.value = '';
                 }
             }
-            // Remove ID field from cloned new forms
-            if (input.name && input.name.endsWith('-id')) {
-                input.value = '';
-            }
-            // Ensure DELETE is not checked (it shouldn't exist on empty_form template, but good practice)
-            if (input.name && input.name.endsWith('-DELETE')) {
-                input.checked = false;
-            }
+            if (input.name && input.name.endsWith('-id')) input.value = '';
+            if (input.name && input.name.endsWith('-DELETE')) input.checked = false;
         });
 
-        // Ensure new forms always get a "Remove" button, not a "DELETE" checkbox
-        // This is handled by the empty_form_template having the remove button.
-        // If cloning an existing form that had a DELETE checkbox, it's replaced.
         let deleteCheckboxDiv = newFormElement.querySelector('.form-check');
         if (deleteCheckboxDiv && deleteCheckboxDiv.querySelector('input[name$="-DELETE"]')) {
             let buttonContainer = newFormElement.querySelector('.col-md-3.text-end');
-            if (buttonContainer) {
-                buttonContainer.innerHTML = '<button type="button" class="btn btn-danger btn-sm remove-item-form">Remove</button>';
-            }
+            if (buttonContainer) buttonContainer.innerHTML = '<button type="button" class="btn btn-danger btn-sm remove-item-form">Remove</button>';
         }
-
 
         container.appendChild(newFormElement);
         totalFormsInput.value = formNum + 1;
+
+        const newMaterialSelect = newFormElement.querySelector('select[name$="-material"]');
+        initializeSelect2(newMaterialSelect); // Initialize Select2 on the new element
 
         attachRemoveListeners();
     });
@@ -212,20 +244,16 @@ document.addEventListener('DOMContentLoaded', function() {
     function handleRemoveClick(event) {
         const itemForm = event.target.closest('.item-form');
         if (itemForm) {
-            // For forms that were part of initial data (have an ID and DELETE checkbox)
             const deleteInput = itemForm.querySelector('input[name$="-DELETE"]');
             if (deleteInput) {
                 deleteInput.checked = true;
-                itemForm.style.display = 'none'; // Hide it, server will process deletion
+                itemForm.style.display = 'none';
             } else {
-                // For newly added forms (no DELETE input), just remove from DOM.
-                // Django's formset processing can handle gaps if TOTAL_FORMS is an overestimate.
-                // No need to decrement TOTAL_FORMS here, could lead to issues if not careful.
                 itemForm.remove();
             }
         }
     }
-    attachRemoveListeners(); // Initial attachment for forms already on page
+    attachRemoveListeners();
 });
 </script>
-{% endblock %}
+{% endblock additional_scripts %}

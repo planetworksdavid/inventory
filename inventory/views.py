@@ -396,18 +396,16 @@ class MaterialAjaxSearch(AutoResponseView):
         return None
 
     def get_queryset(self):
-        # No longer need category_id logic here as it was removed
-
-        if self.term:
+        # Explicitly check for None or empty string (after stripping whitespace)
+        if self.term is None or self.term.strip() == "":
+            # No search term, provide initial default options
+            return Material.objects.all().order_by('name')[:15] # Initial list limit
+        else:
             # User is searching
             qs = Material.objects.filter(
                 Q(name__icontains=self.term) | Q(sku__icontains=self.term)
             ).order_by('name')
             return qs[:50] # Limit search results
-        else:
-            # No search term, provide initial default options
-            # Return, for example, the first 15 materials alphabetically
-            return Material.objects.all().order_by('name')[:15] # Initial list limit
 
     def get_result_label(self, item): # Keep this
         return f"{item.name} (SKU: {item.sku})"
