@@ -135,32 +135,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const totalFormsInput = document.querySelector('input[name="{{ formset.prefix }}-TOTAL_FORMS"]');
     const emptyFormTemplateDiv = document.getElementById('empty-form-template');
 
-    function initializeSelect2(selectElement, formIndex) { // Added formIndex for unique logging
-        console.log(`[Form ${formIndex}] Attempting to initialize Select2 for element:`, selectElement);
-        if (selectElement && typeof $ !== 'undefined' && $.fn.select2) {
-            // Clean element before re-initializing, especially if cloned
-            if ($(selectElement).data('select2')) {
-                console.log(`[Form ${formIndex}] Destroying existing Select2 instance.`);
-                $(selectElement).select2('destroy'); // Remove previous instance
-            }
-            // Remove potentially problematic data attributes that might have been cloned
-            // These are specific to how django-select2 might have initialized it.
-            // Standard select2 does not use data-field_id or data-select2-id in this manner.
-            // data-ajax--url is the key one if it was set via HTML attribute by django-select2's widget rendering.
-            $(selectElement).removeAttr('data-field_id')
-                            .removeAttr('data-select2-id') // This is Select2's internal ID, usually safe to leave if destroying.
-                            .removeAttr('data-ajax--url')
-                            .removeAttr('data-minimum-input-length')
-                            .removeAttr('data-placeholder');
-
-            // Clear any existing options if it's a cloned select with <option> tags
-            // $(selectElement).empty(); // Might be too aggressive if there's a placeholder option
-
-            console.log(`[Form ${formIndex}] Element attributes after cleaning (outerHTML):`, selectElement.outerHTML);
-
+    // This function will now primarily be for NEWLY ADDED rows from empty_form,
+    // as existing rows should be initialized by django-select2's own JS via form.media.
+    function initializeSelect2(selectElement, formIndex) { // formIndex for logging
+        console.log(`[Form ${formIndex}] initializeSelect2 called for:`, selectElement);
+        // Only initialize if jQuery and Select2 are loaded, AND if Select2 hasn't already been initialized on this element.
+        // The last condition is key: existing django-select2 widgets are already initialized.
+        if (selectElement && typeof $ !== 'undefined' && $.fn.select2 && !$(selectElement).hasClass('select2-hidden-accessible') && !$(selectElement).data('select2')) {
             const ajaxUrl = "{% url 'inventory:material_ajax_search' %}";
-            // Category filter is removed, so ajaxUrl does not need category_id parameter.
-            console.log(`[Form ${formIndex}] Initializing Select2 with AJAX URL:`, ajaxUrl);
+            console.log(`[Form ${formIndex}] Initializing NEW Select2 instance with AJAX URL:`, ajaxUrl, 'for element:', selectElement);
 
             $(selectElement).select2({
                 ajax: {
@@ -168,36 +151,43 @@ document.addEventListener('DOMContentLoaded', function() {
                     dataType: 'json',
                     delay: 250,
                     data: function (params) {
-                        console.log(`[Form ${formIndex}] Select2 AJAX data params:`, params);
+                        console.log(`[Form ${formIndex}] Select2 AJAX data params:`, params, "for element", selectElement);
                         return { term: params.term, page: params.page };
                     },
                     processResults: function (data, params) {
                         params.page = params.page || 1;
-                        console.log(`[Form ${formIndex}] Select2 AJAX processResults data:`, data);
+                        console.log(`[Form ${formIndex}] Select2 AJAX processResults data:`, data, "for element", selectElement);
                         return { results: data.results, pagination: { more: data.pagination && data.pagination.more } };
                     },
                     cache: true
                 },
                 placeholder: 'Search for a material by name or SKU...',
-                minimumInputLength: 1, // Changed from 0
+                minimumInputLength: 1, // Requires typing to search
                 width: '100%',
                 allowClear: true
             });
         } else {
             if (!selectElement) console.error(`[Form ${formIndex}] InitializeSelect2: selectElement is null`);
-            if (typeof $ === 'undefined') console.error(`[Form ${formIndex}] InitializeSelect2: jQuery not loaded`);
-            if ($.fn.select2 === undefined) console.error(`[Form ${formIndex}] InitializeSelect2: Select2 plugin not loaded on jQuery`);
-            if (selectElement && $(selectElement).data('select2')) console.warn(`[Form ${formIndex}] InitializeSelect2: Select2 already initialized for element (this shouldn't happen if destroy worked):`, selectElement);
+            else if (typeof $ === 'undefined') console.error(`[Form ${formIndex}] InitializeSelect2: jQuery not loaded`);
+            else if ($.fn.select2 === undefined) console.error(`[Form ${formIndex}] InitializeSelect2: Select2 plugin not loaded on jQuery`);
+            else if ($(selectElement).hasClass('select2-hidden-accessible') || $(selectElement).data('select2')) {
+                console.log(`[Form ${formIndex}] Select2 already initialized by django-select2 for element:`, selectElement);
+            }
         }
     }
 
-    // Initialize Select2 on existing forms
-    console.log('Initializing Select2 for existing material forms on page load...');
+    // Call initializeSelect2 for any select elements that might be plain
+    // (e.g. if django-select2 didn't auto-init for some reason, or for new rows).
+    // For existing rows, django-select2's JS from formset.media should handle them.
+    // This loop is more of a fallback or for cases where django-select2 might miss.
+    // However, the primary target for our initializeSelect2 is now dynamically added rows.
+    console.log('Checking existing material forms on page load (should be handled by django-select2 usually)...');
     container.querySelectorAll('.item-form select[name$="-material"]').forEach(function(select, index) {
-        initializeSelect2(select, `initial-${index}`);
+        // We expect django-select2 to initialize these. Our function will log if it's already done.
+        initializeSelect2(select, `initial-on-load-${index}`);
     });
 
-    // Main category filter change event listener is removed as category_filter itself is removed.
+    // Main category filter change event listener is removed.
 
     let formTemplateHtml = '';
     if (emptyFormTemplateDiv && emptyFormTemplateDiv.firstElementChild) {
@@ -208,31 +198,79 @@ document.addEventListener('DOMContentLoaded', function() {
 
     addButton.addEventListener('click', function() {
         if (!formTemplateHtml) {
-             if (container.firstElementChild && container.firstElementChild.classList.contains('item-form')) {
+             if (container.firstElementChild && container.firstElementChild.classList.contains('item-form')) { // Check classList
                  formTemplateHtml = container.firstElementChild.outerHTML;
             } else {
                 console.error("No form template found to clone. Ensure formset.empty_form is rendered correctly or at least one form exists.");
-                alert("Error: Cannot add new item. Form template is missing. Please reload.");
+                // alert("Error: Cannot add new item. Form template is missing. Please reload."); // User feedback indicates alerts are annoying
                 return;
             }
         }
 
         let formNum = parseInt(totalFormsInput.value);
-        console.log('Adding new item form, current total forms (next index will be this number):', formNum);
-
-        let newFormHtml = formTemplateHtml.replace(/__prefix__/g, formNum);
+        console.log('Adding new item form, current total forms (next index):', formNum);
 
         let tempDiv = document.createElement('div');
-        tempDiv.innerHTML = newFormHtml;
-        let newFormNode = tempDiv.firstElementChild;
+        // Replace __prefix__ in the raw template HTML string
+        tempDiv.innerHTML = emptyFormTemplateDiv.innerHTML.replace(/__prefix__/g, formNum);
 
-        if (!newFormNode || !newFormNode.classList.contains('item-form')) {
-            console.error("Cloned form structure is invalid. Expected .item-form wrapper. Cloned HTML:", newFormHtml);
+        let newFormNode = null;
+        if(tempDiv.firstElementChild && tempDiv.firstElementChild.classList.contains('item-form')) {
+            newFormNode = tempDiv.firstElementChild;
+        } else {
+             console.error("Cloned structure from empty_form_template is not as expected. Cannot find .item-form wrapper in cloned content:", tempDiv.innerHTML);
+             // alert("Error in form template structure. Please check console.");
+             return;
+        }
+
+        if (!newFormNode) { // Should be caught by above, but as a safeguard
+            console.error("Could not derive newFormNode from empty_form_template. Aborting add.");
             return;
         }
 
-        // Clear values from cloned form
-        newFormNode.querySelectorAll('input, select, textarea').forEach(input => {
+        container.appendChild(newFormNode);
+        totalFormsInput.value = formNum + 1; // Increment for the next form
+        console.log('New item form added. New total forms count:', totalFormsInput.value);
+
+        const newMaterialSelect = newFormNode.querySelector('select[name$="-material"]');
+        console.log('Found new material select element for initialization:', newMaterialSelect);
+        if (newMaterialSelect) {
+            // This is where our function is critical for the new row
+            initializeSelect2(newMaterialSelect, `dynamic-${formNum}`);
+        } else {
+            console.error('Could not find material select in new form row for form index:', formNum);
+        }
+        attachRemoveListeners();
+    });
+
+    function attachRemoveListeners() {
+        // ... (same as before)
+        container.querySelectorAll('.remove-item-form').forEach(button => {
+            button.removeEventListener('click', handleRemoveClick);
+            button.addEventListener('click', handleRemoveClick);
+        });
+    }
+
+    function handleRemoveClick(event) {
+        // ... (same as before, with console logs)
+        const itemForm = event.target.closest('.item-form');
+        if (itemForm) {
+            const deleteInput = itemForm.querySelector('input[name$="-DELETE"]');
+            if (deleteInput && deleteInput.checked) { return; }
+            if (deleteInput) {
+                deleteInput.checked = true;
+                itemForm.style.display = 'none';
+                console.log('Marked item for deletion:', itemForm);
+            } else {
+                console.log('Removing new item form:', itemForm);
+                itemForm.remove();
+            }
+        }
+    }
+    attachRemoveListeners(); // Initial call
+});
+</script>
+{% endblock additional_scripts %}
             if (input.type !== 'hidden' && input.type !== 'button' && input.type !== 'submit' && input.name && !input.name.includes('FORMS')) {
                 if (input.type === 'checkbox' || input.type === 'radio') input.checked = false;
                 else if (input.tagName === 'SELECT') {
