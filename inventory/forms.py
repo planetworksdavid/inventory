@@ -9,19 +9,13 @@ class LoginForm(forms.Form):
     password = forms.CharField(widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Password'}), required=True)
 
 class MaterialRequestForm(forms.ModelForm):
-    category_filter = forms.ModelChoiceField(
-        queryset=MaterialCategory.objects.all().order_by('name'),
-        required=False,
-        label="Filter Items by Category (for search below)",
-        widget=Select2Widget(attrs={'data-placeholder': 'All Categories', 'style': 'width: 100%;', 'class': 'form-select mb-3'})
-    )
     date_required = forms.DateField(
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
         required=True
     )
     class Meta:
         model = MaterialRequest
-        fields = ['category_filter', 'date_required', 'justification']
+        fields = ['date_required', 'justification']
         widgets = {
             'justification': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
         }
@@ -88,12 +82,6 @@ class MaterialForm(forms.ModelForm):
         return cleaned_data
 
 class StockTransactionForm(forms.ModelForm):
-    category_filter = forms.ModelChoiceField(
-        queryset=MaterialCategory.objects.all().order_by('name'),
-        required=False,
-        label="Filter by Category",
-        widget=Select2Widget(attrs={'data-placeholder': 'All Categories', 'style': 'width: 100%;', 'class': 'form-select mb-3'})
-    )
     cost_per_unit_at_transaction = forms.DecimalField(
         max_digits=10, decimal_places=2, required=False,
         label="Cost Per Unit (for this transaction)",
@@ -108,7 +96,7 @@ class StockTransactionForm(forms.ModelForm):
     class Meta:
         model = StockTransaction
         fields = [
-            'category_filter', 'material', 'quantity_change',
+            'material', 'quantity_change',
             'cost_per_unit_at_transaction', 'total_cost_of_transaction',
             'notes'
         ]
@@ -116,7 +104,11 @@ class StockTransactionForm(forms.ModelForm):
             'material': ModelSelect2Widget(
                 model=Material,
                 search_fields=['name__icontains', 'sku__icontains'],
-                attrs={'data-placeholder': 'Search for a material by name or SKU...', 'style': 'width: 100%;'},
+                    attrs={
+                        'data-placeholder': 'Search for a material by name or SKU...',
+                        'style': 'width: 100%;',
+                        'data-minimum-input-length': '0' # Add/Ensure this
+                    },
                 data_url=reverse_lazy('inventory:material_ajax_search')
             ),
             'quantity_change': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Positive value for additions'}),

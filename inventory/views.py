@@ -173,7 +173,11 @@ def material_request_edit_view(request, request_id):
             'material': ModelSelect2Widget(
                 model=Material,
                 search_fields=['name__icontains', 'sku__icontains'],
-                attrs={'data-placeholder': 'Search for a material...', 'style': 'width: 100%;'},
+                    attrs={
+                        'data-placeholder': 'Search for a material...',
+                        'style': 'width: 100%;',
+                        'data-minimum-input-length': '0' # Add/Ensure this
+                    },
                 data_url=reverse_lazy('inventory:material_ajax_search')
             ),
             'quantity_requested': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'})
@@ -392,26 +396,20 @@ class MaterialAjaxSearch(AutoResponseView):
         return None
 
     def get_queryset(self):
-        qs = Material.objects.all().order_by('name')
+        # No longer need category_id logic here as it was removed
 
-        category_id = self.request.GET.get('category_id', None)
-        if category_id:
-            try:
-                # Ensure category_id is an integer before filtering
-                qs = qs.filter(category_id=int(category_id))
-            except ValueError:
-                # Invalid category_id, ignore or handle as error
-                # For now, ignoring to return results not filtered by invalid category
-                pass
+        if self.term:
+            # User is searching
+            qs = Material.objects.filter(
+                Q(name__icontains=self.term) | Q(sku__icontains=self.term)
+            ).order_by('name')
+            return qs[:50] # Limit search results
+        else:
+            # No search term, provide initial default options
+            # Return, for example, the first 15 materials alphabetically
+            return Material.objects.all().order_by('name')[:15] # Initial list limit
 
-        if self.term: # self.term is the search term from select2
-            qs = qs.filter(Q(name__icontains=self.term) | Q(sku__icontains=self.term))
-
-        # Limit results to avoid sending too much data, e.g., first 25-50
-        return qs[:50] # Example limit
-
-    # Optional: Customize result label if default (str(model_instance)) is not ideal
-    def get_result_label(self, item):
+    def get_result_label(self, item): # Keep this
         return f"{item.name} (SKU: {item.sku})"
 
     # Optional: Customize result value (usually item.pk)
