@@ -136,39 +136,56 @@ document.addEventListener('DOMContentLoaded', function() {
     const emptyFormTemplateDiv = document.getElementById('empty-form-template');
 
     function initializeSelect2(selectElement) {
+        console.log('Attempting to initialize Select2 for element:', selectElement);
         if (selectElement && typeof $ !== 'undefined' && $.fn.select2 && !$(selectElement).data('select2')) {
             let ajaxUrl = "{% url 'inventory:material_ajax_search' %}";
-            const mainCategoryFilter = document.getElementById('{{ form.category_filter.id_for_label }}');
+            // Category filter logic for this specific Select2 instance if needed
+            const mainCategoryFilter = document.getElementById('{{ form.category_filter.id_for_label }}'); // Main form category filter
             if (mainCategoryFilter && mainCategoryFilter.value) {
-                ajaxUrl += "?category_id=" + mainCategoryFilter.value;
+                 ajaxUrl += "?category_id=" + mainCategoryFilter.value;
             }
-
+            console.log('Initializing Select2 with AJAX URL:', ajaxUrl, 'for element:', selectElement);
             $(selectElement).select2({
                 ajax: {
                     url: ajaxUrl,
                     dataType: 'json',
                     delay: 250,
-                    data: function (params) { return { term: params.term, page: params.page }; },
+                    data: function (params) {
+                        console.log('Select2 AJAX data params for element:', selectElement, 'Params:', params);
+                        let query = { term: params.term, page: params.page };
+                        // Re-check category filter value at time of query
+                        if (mainCategoryFilter && mainCategoryFilter.value) {
+                            query.category_id = mainCategoryFilter.value;
+                        }
+                        return query;
+                    },
                     processResults: function (data, params) {
                         params.page = params.page || 1;
+                        console.log('Select2 AJAX processResults for element:', selectElement, 'Data:', data);
                         return { results: data.results, pagination: { more: data.pagination && data.pagination.more } };
                     },
                     cache: true
                 },
-                placeholder: 'Search for a material...',
-                minimumInputLength: 0,
+                placeholder: 'Search for a material by name or SKU...',
+                minimumInputLength: 1, // Changed from 0
                 width: '100%',
                 allowClear: true
             });
-        } else if (typeof $ === 'undefined' || !$.fn.select2) {
-            console.warn('jQuery or Select2 not available for element:', selectElement);
+        } else {
+            if (!selectElement) console.error('InitializeSelect2: selectElement is null');
+            if (typeof $ === 'undefined') console.error('InitializeSelect2: jQuery not loaded');
+            if (typeof $ !== 'undefined' && !$.fn.select2) console.error('InitializeSelect2: Select2 plugin not loaded on jQuery'); // check if $ is defined before checking $.fn
+            if (selectElement && $(selectElement).data('select2')) console.warn('InitializeSelect2: Select2 already initialized for element:', selectElement);
         }
     }
 
+    // Initialize Select2 on existing forms
+    console.log('Initializing Select2 for existing material forms on page load...');
     container.querySelectorAll('.item-form select[name$="-material"]').forEach(function(select) {
         initializeSelect2(select);
     });
 
+    // Main category filter change event to update all material Select2 instances
     const mainCategoryFilter = document.getElementById('{{ form.category_filter.id_for_label }}');
     if (mainCategoryFilter && typeof $ !== 'undefined' && $.fn.select2) {
         mainCategoryFilter.addEventListener('change', function() {
@@ -177,48 +194,53 @@ document.addEventListener('DOMContentLoaded', function() {
             if (selectedCategoryId) {
                 newAjaxUrl += "?category_id=" + selectedCategoryId;
             }
-            container.querySelectorAll('.item-form select[name$="-material"]').forEach(function(materialSelect) {
-                const $materialSelect = $(materialSelect);
+            console.log('Main category filter changed. New AJAX URL for all material selects:', newAjaxUrl);
+            container.querySelectorAll('.item-form select[name$="-material"]').forEach(function(materialSelectElement) {
+                const $materialSelect = $(materialSelectElement);
                 if ($materialSelect.data('select2')) {
                     $materialSelect.val(null).trigger('change'); // Clear current selection
-                    var S2options = $materialSelect.data('select2').options.options; // get current options
-                    S2options.ajax.url = newAjaxUrl; // update the url
-                    $materialSelect.select2('destroy').select2(S2options); // re-init
-                } else { // If select2 not yet initialized (e.g. very first form added before initial scan)
-                    initializeSelect2(materialSelect); // Initialize it now
+                    var S2options = $materialSelect.data('select2').options.options;
+                    S2options.ajax.url = newAjaxUrl;
+                    $materialSelect.select2('destroy').select2(S2options);
+                    console.log('Re-initialized Select2 for:', materialSelectElement, 'with new URL:', newAjaxUrl);
+                } else {
+                     initializeSelect2(materialSelectElement); // Should already be init, but as fallback
+                     console.log('Initialized new Select2 for:', materialSelectElement, 'with new URL:', newAjaxUrl);
                 }
             });
         });
     }
 
     let formTemplateHtml = '';
-    if (emptyFormTemplateDiv && emptyFormTemplateDiv.firstElementChild) {
+    if (emptyFormTemplateDiv && emptyFormTemplateDiv.firstElementChild) { // Ensure it's the .item-form div
         formTemplateHtml = emptyFormTemplateDiv.firstElementChild.outerHTML;
-    } else if (container.firstElementChild) {
+    } else if (container.firstElementChild && container.firstElementChild.classList.contains('item-form')) {
         formTemplateHtml = container.firstElementChild.outerHTML; // Fallback
     }
 
 
     addButton.addEventListener('click', function() {
         if (!formTemplateHtml) {
-             if (container.firstElementChild) { // Try to grab template again
+             if (container.firstElementChild && container.firstElementChild.classList.contains('item-form')) {
                  formTemplateHtml = container.firstElementChild.outerHTML;
             } else {
                 console.error("No form template found to clone. Ensure formset.empty_form is rendered correctly or at least one form exists.");
-                alert("Error: Cannot add new item. Form template is missing.");
+                alert("Error: Cannot add new item. Form template is missing. Please reload.");
                 return;
             }
         }
 
         let formNum = parseInt(totalFormsInput.value);
+        console.log('Adding new item form, current total forms (next index):', formNum);
+
         let newFormHtml = formTemplateHtml.replace(/__prefix__/g, formNum);
 
         let tempDiv = document.createElement('div');
         tempDiv.innerHTML = newFormHtml;
         let newFormElement = tempDiv.firstElementChild;
 
-        if (!newFormElement) {
-            console.error("Cloned form structure is invalid.");
+        if (!newFormElement || !newFormElement.classList.contains('item-form')) {
+            console.error("Cloned form structure is invalid. Expected .item-form wrapper. Cloned HTML:", newFormHtml);
             return;
         }
 
@@ -226,7 +248,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (input.type !== 'hidden' && input.type !== 'button' && input.type !== 'submit' && input.name && !input.name.includes('FORMS')) {
                 if (input.type === 'checkbox' || input.type === 'radio') input.checked = false;
                 else if (input.tagName === 'SELECT') {
-                    if ($(input).data('select2')) $(input).val(null).trigger('change'); // Clear select2
+                    if ($(input).data('select2')) $(input).val(null).trigger('change');
                     else input.selectedIndex = 0;
                 } else input.value = '';
             }
@@ -238,7 +260,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (deleteCheckboxDiv && deleteCheckboxDiv.querySelector('input[name$="-DELETE"]')) {
             let buttonContainer = newFormElement.querySelector('.col-md-3.text-end');
             if (buttonContainer) buttonContainer.innerHTML = '<button type="button" class="btn btn-danger btn-sm remove-item-form">Remove</button>';
-        } else { // Ensure new forms always have a remove button if no DELETE checkbox was cloned
+        } else {
              let buttonContainer = newFormElement.querySelector('.col-md-3.text-end');
              if(buttonContainer && !buttonContainer.querySelector('.remove-item-form')){
                  buttonContainer.innerHTML = '<button type="button" class="btn btn-danger btn-sm remove-item-form">Remove</button>';
@@ -247,8 +269,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         container.appendChild(newFormElement);
         totalFormsInput.value = formNum + 1;
+        console.log('New item form added. New total forms count:', totalFormsInput.value);
 
         const newMaterialSelect = newFormElement.querySelector('select[name$="-material"]');
+        console.log('Found new material select element for initialization:', newMaterialSelect);
         initializeSelect2(newMaterialSelect);
 
         attachRemoveListeners();
