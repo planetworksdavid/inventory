@@ -17,6 +17,12 @@
             <div class="alert alert-danger">{{ form.non_field_errors|join:", " }}</div>
         {% endif %}
 
+        <div class="mb-3"> {# Moved category_filter here, before date_required #}
+            <label for="{{ form.category_filter.id_for_label }}" class="form-label">{{ form.category_filter.label_tag }}</label>
+            {{ form.category_filter }}
+            {% if form.category_filter.errors %}<div class="invalid-feedback d-block">{{ form.category_filter.errors|join:", " }}</div>{% endif %}
+        </div>
+
         <div class="row mb-3">
             <div class="col-md-6">
                 <label for="{{ form.date_required.id_for_label }}" class="form-label">{{ form.date_required.label_tag }}</label>
@@ -48,24 +54,24 @@
                     {% if item_form.non_field_errors %}
                         <div class="alert alert-danger">{{ item_form.non_field_errors|join:", " }}</div>
                     {% endif %}
-                    <div class="row align-items-end"> {# Use align-items-end for button alignment #}
-                        <div class="col-md-5"> {# Adjusted col size #}
+                    <div class="row align-items-end">
+                        <div class="col-md-5">
                             <label for="{{ item_form.material.id_for_label }}" class="form-label">{{ item_form.material.label_tag }}</label>
                             {{ item_form.material }}
                             {% if item_form.material.errors %}
                                 <div class="invalid-feedback d-block">{{ item_form.material.errors|join:", " }}</div>
                             {% endif %}
                         </div>
-                        <div class="col-md-4"> {# Adjusted col size #}
+                        <div class="col-md-4">
                             <label for="{{ item_form.quantity_requested.id_for_label }}" class="form-label">{{ item_form.quantity_requested.label_tag }}</label>
                             {{ item_form.quantity_requested }}
                             {% if item_form.quantity_requested.errors %}
                                 <div class="invalid-feedback d-block">{{ item_form.quantity_requested.errors|join:", " }}</div>
                             {% endif %}
                         </div>
-                        <div class="col-md-3 text-end"> {# Adjusted col size and alignment #}
+                        <div class="col-md-3 text-end">
                             {% if item_form.instance.pk and formset.can_delete %}
-                            <div class="form-check mb-2"> {# Added margin for spacing #}
+                            <div class="form-check mb-2">
                                 {{ item_form.DELETE }}
                                 <label class="form-check-label" for="{{ item_form.DELETE.id_for_label }}">Delete this item</label>
                             </div>
@@ -74,7 +80,7 @@
                             {% endif %}
                         </div>
                     </div>
-                    {{ item_form.id }} {# Hidden field for existing item ID #}
+                    {{ item_form.id }}
                 </div>
             {% endfor %}
         </div>
@@ -89,9 +95,10 @@
     </form>
 </div>
 
+{# Hidden template for new formset items #}
 <div id="empty-form-template" style="display: none;">
-    {% if formset.empty_form %}
-    <div class="item-form mb-3 p-3 border rounded">
+    <div class="item-form mb-3 p-3 border rounded"> {# This is the wrapper that will be cloned #}
+        {{ formset.empty_form.management_form_hidden_fields|default_if_none:"" }} {# Include if empty_form has them #}
         {% if formset.empty_form.non_field_errors %}
             <div class="alert alert-danger">{{ formset.empty_form.non_field_errors|join:", " }}</div>
         {% endif %}
@@ -116,74 +123,89 @@
         </div>
         {{ formset.empty_form.id }}
     </div>
-    {% endif %}
 </div>
-
+{% endblock content %}
 
 {% block additional_scripts %}
+{{ super }} {# In case base has some scripts in this block #}
 <script type="text/javascript">
 document.addEventListener('DOMContentLoaded', function() {
     const container = document.getElementById('item-forms-container');
     const addButton = document.getElementById('add-item-form');
     const totalFormsInput = document.querySelector('input[name="{{ formset.prefix }}-TOTAL_FORMS"]');
-    const emptyFormTemplate = document.getElementById('empty-form-template');
+    const emptyFormTemplateDiv = document.getElementById('empty-form-template');
 
-    // Function to initialize Select2 on a given select element
     function initializeSelect2(selectElement) {
-        if (selectElement && typeof $ !== 'undefined' && !$(selectElement).data('select2')) { // Check if jQuery available and not already initialized
+        if (selectElement && typeof $ !== 'undefined' && $.fn.select2 && !$(selectElement).data('select2')) {
+            let ajaxUrl = "{% url 'inventory:material_ajax_search' %}";
+            const mainCategoryFilter = document.getElementById('{{ form.category_filter.id_for_label }}');
+            if (mainCategoryFilter && mainCategoryFilter.value) {
+                ajaxUrl += "?category_id=" + mainCategoryFilter.value;
+            }
+
             $(selectElement).select2({
                 ajax: {
-                    url: "{% url 'inventory:material_ajax_search' %}", // Ensure this URL is correct
+                    url: ajaxUrl,
                     dataType: 'json',
-                    delay: 250, // Wait 250ms after typing before searching
-                    data: function (params) {
-                        return {
-                            term: params.term, // search term
-                            page: params.page
-                        };
-                    },
+                    delay: 250,
+                    data: function (params) { return { term: params.term, page: params.page }; },
                     processResults: function (data, params) {
                         params.page = params.page || 1;
-                        return {
-                            results: data.results, // Assuming your AJAX view returns data in {results: [...]} format
-                            pagination: {
-                                more: data.pagination && data.pagination.more // Assuming pagination info
-                            }
-                        };
+                        return { results: data.results, pagination: { more: data.pagination && data.pagination.more } };
                     },
                     cache: true
                 },
                 placeholder: 'Search for a material...',
-                minimumInputLength: 0, // Trigger AJAX on focus to get initial list
+                minimumInputLength: 0,
                 width: '100%',
                 allowClear: true
             });
-        } else if (typeof $ === 'undefined') {
-             console.warn("jQuery not loaded. Select2 cannot be initialized for material request items.");
+        } else if (typeof $ === 'undefined' || !$.fn.select2) {
+            console.warn('jQuery or Select2 not available for element:', selectElement);
         }
     }
 
-    // Initialize Select2 on existing forms (rendered by Django)
     container.querySelectorAll('.item-form select[name$="-material"]').forEach(function(select) {
         initializeSelect2(select);
     });
 
-    // Formset Add/Remove logic
+    const mainCategoryFilter = document.getElementById('{{ form.category_filter.id_for_label }}');
+    if (mainCategoryFilter && typeof $ !== 'undefined' && $.fn.select2) {
+        mainCategoryFilter.addEventListener('change', function() {
+            const selectedCategoryId = this.value;
+            let newAjaxUrl = "{% url 'inventory:material_ajax_search' %}";
+            if (selectedCategoryId) {
+                newAjaxUrl += "?category_id=" + selectedCategoryId;
+            }
+            container.querySelectorAll('.item-form select[name$="-material"]').forEach(function(materialSelect) {
+                const $materialSelect = $(materialSelect);
+                if ($materialSelect.data('select2')) {
+                    $materialSelect.val(null).trigger('change'); // Clear current selection
+                    var S2options = $materialSelect.data('select2').options.options; // get current options
+                    S2options.ajax.url = newAjaxUrl; // update the url
+                    $materialSelect.select2('destroy').select2(S2options); // re-init
+                } else { // If select2 not yet initialized (e.g. very first form added before initial scan)
+                    initializeSelect2(materialSelect); // Initialize it now
+                }
+            });
+        });
+    }
+
     let formTemplateHtml = '';
-    if (emptyFormTemplate && emptyFormTemplate.innerHTML.trim()) {
-        formTemplateHtml = emptyFormTemplate.innerHTML;
-    } else if (container.children.length > 0) {
-        formTemplateHtml = container.children[0].outerHTML; // Fallback
+    if (emptyFormTemplateDiv && emptyFormTemplateDiv.firstElementChild) {
+        formTemplateHtml = emptyFormTemplateDiv.firstElementChild.outerHTML;
+    } else if (container.firstElementChild) {
+        formTemplateHtml = container.firstElementChild.outerHTML; // Fallback
     }
 
 
     addButton.addEventListener('click', function() {
         if (!formTemplateHtml) {
-            if (container.children.length > 0) { // Try to grab template again
-                 formTemplateHtml = container.children[0].outerHTML;
+             if (container.firstElementChild) { // Try to grab template again
+                 formTemplateHtml = container.firstElementChild.outerHTML;
             } else {
-                console.error("No form template found to clone.");
-                alert("Cannot add new item: form template missing.");
+                console.error("No form template found to clone. Ensure formset.empty_form is rendered correctly or at least one form exists.");
+                alert("Error: Cannot add new item. Form template is missing.");
                 return;
             }
         }
@@ -196,24 +218,17 @@ document.addEventListener('DOMContentLoaded', function() {
         let newFormElement = tempDiv.firstElementChild;
 
         if (!newFormElement) {
-            console.error("Cloned form structure is invalid from template:", formTemplateHtml);
+            console.error("Cloned form structure is invalid.");
             return;
         }
 
-        // Clear values
         newFormElement.querySelectorAll('input, select, textarea').forEach(input => {
             if (input.type !== 'hidden' && input.type !== 'button' && input.type !== 'submit' && input.name && !input.name.includes('FORMS')) {
                 if (input.type === 'checkbox' || input.type === 'radio') input.checked = false;
                 else if (input.tagName === 'SELECT') {
-                    // For select2, clearing and re-initializing is better than just setting selectedIndex
-                    if ($(input).data('select2')) { // If it was a select2 already in template
-                        $(input).val(null).trigger('change');
-                    } else {
-                        input.selectedIndex = 0;
-                    }
-                } else {
-                    input.value = '';
-                }
+                    if ($(input).data('select2')) $(input).val(null).trigger('change'); // Clear select2
+                    else input.selectedIndex = 0;
+                } else input.value = '';
             }
             if (input.name && input.name.endsWith('-id')) input.value = '';
             if (input.name && input.name.endsWith('-DELETE')) input.checked = false;
@@ -223,13 +238,18 @@ document.addEventListener('DOMContentLoaded', function() {
         if (deleteCheckboxDiv && deleteCheckboxDiv.querySelector('input[name$="-DELETE"]')) {
             let buttonContainer = newFormElement.querySelector('.col-md-3.text-end');
             if (buttonContainer) buttonContainer.innerHTML = '<button type="button" class="btn btn-danger btn-sm remove-item-form">Remove</button>';
+        } else { // Ensure new forms always have a remove button if no DELETE checkbox was cloned
+             let buttonContainer = newFormElement.querySelector('.col-md-3.text-end');
+             if(buttonContainer && !buttonContainer.querySelector('.remove-item-form')){
+                 buttonContainer.innerHTML = '<button type="button" class="btn btn-danger btn-sm remove-item-form">Remove</button>';
+             }
         }
 
         container.appendChild(newFormElement);
         totalFormsInput.value = formNum + 1;
 
         const newMaterialSelect = newFormElement.querySelector('select[name$="-material"]');
-        initializeSelect2(newMaterialSelect); // Initialize Select2 on the new element
+        initializeSelect2(newMaterialSelect);
 
         attachRemoveListeners();
     });
