@@ -127,7 +127,7 @@
 {% endblock content %}
 
 {% block additional_scripts %}
-{{ super }} {# In case base has some scripts in this block #}
+{{ super }}
 <script type="text/javascript">
 document.addEventListener('DOMContentLoaded', function() {
     const container = document.getElementById('item-forms-container');
@@ -135,33 +135,45 @@ document.addEventListener('DOMContentLoaded', function() {
     const totalFormsInput = document.querySelector('input[name="{{ formset.prefix }}-TOTAL_FORMS"]');
     const emptyFormTemplateDiv = document.getElementById('empty-form-template');
 
-    function initializeSelect2(selectElement) {
-        console.log('Attempting to initialize Select2 for element:', selectElement);
-        if (selectElement && typeof $ !== 'undefined' && $.fn.select2 && !$(selectElement).data('select2')) {
-            let ajaxUrl = "{% url 'inventory:material_ajax_search' %}";
-            // Category filter logic for this specific Select2 instance if needed
-            const mainCategoryFilter = document.getElementById('{{ form.category_filter.id_for_label }}'); // Main form category filter
-            if (mainCategoryFilter && mainCategoryFilter.value) {
-                 ajaxUrl += "?category_id=" + mainCategoryFilter.value;
+    function initializeSelect2(selectElement, formIndex) { // Added formIndex for unique logging
+        console.log(`[Form ${formIndex}] Attempting to initialize Select2 for element:`, selectElement);
+        if (selectElement && typeof $ !== 'undefined' && $.fn.select2) {
+            // Clean element before re-initializing, especially if cloned
+            if ($(selectElement).data('select2')) {
+                console.log(`[Form ${formIndex}] Destroying existing Select2 instance.`);
+                $(selectElement).select2('destroy'); // Remove previous instance
             }
-            console.log('Initializing Select2 with AJAX URL:', ajaxUrl, 'for element:', selectElement);
+            // Remove potentially problematic data attributes that might have been cloned
+            // These are specific to how django-select2 might have initialized it.
+            // Standard select2 does not use data-field_id or data-select2-id in this manner.
+            // data-ajax--url is the key one if it was set via HTML attribute by django-select2's widget rendering.
+            $(selectElement).removeAttr('data-field_id')
+                            .removeAttr('data-select2-id') // This is Select2's internal ID, usually safe to leave if destroying.
+                            .removeAttr('data-ajax--url')
+                            .removeAttr('data-minimum-input-length')
+                            .removeAttr('data-placeholder');
+
+            // Clear any existing options if it's a cloned select with <option> tags
+            // $(selectElement).empty(); // Might be too aggressive if there's a placeholder option
+
+            console.log(`[Form ${formIndex}] Element attributes after cleaning (outerHTML):`, selectElement.outerHTML);
+
+            const ajaxUrl = "{% url 'inventory:material_ajax_search' %}";
+            // Category filter is removed, so ajaxUrl does not need category_id parameter.
+            console.log(`[Form ${formIndex}] Initializing Select2 with AJAX URL:`, ajaxUrl);
+
             $(selectElement).select2({
                 ajax: {
                     url: ajaxUrl,
                     dataType: 'json',
                     delay: 250,
                     data: function (params) {
-                        console.log('Select2 AJAX data params for element:', selectElement, 'Params:', params);
-                        let query = { term: params.term, page: params.page };
-                        // Re-check category filter value at time of query
-                        if (mainCategoryFilter && mainCategoryFilter.value) {
-                            query.category_id = mainCategoryFilter.value;
-                        }
-                        return query;
+                        console.log(`[Form ${formIndex}] Select2 AJAX data params:`, params);
+                        return { term: params.term, page: params.page };
                     },
                     processResults: function (data, params) {
                         params.page = params.page || 1;
-                        console.log('Select2 AJAX processResults for element:', selectElement, 'Data:', data);
+                        console.log(`[Form ${formIndex}] Select2 AJAX processResults data:`, data);
                         return { results: data.results, pagination: { more: data.pagination && data.pagination.more } };
                     },
                     cache: true
@@ -172,52 +184,27 @@ document.addEventListener('DOMContentLoaded', function() {
                 allowClear: true
             });
         } else {
-            if (!selectElement) console.error('InitializeSelect2: selectElement is null');
-            if (typeof $ === 'undefined') console.error('InitializeSelect2: jQuery not loaded');
-            if (typeof $ !== 'undefined' && !$.fn.select2) console.error('InitializeSelect2: Select2 plugin not loaded on jQuery'); // check if $ is defined before checking $.fn
-            if (selectElement && $(selectElement).data('select2')) console.warn('InitializeSelect2: Select2 already initialized for element:', selectElement);
+            if (!selectElement) console.error(`[Form ${formIndex}] InitializeSelect2: selectElement is null`);
+            if (typeof $ === 'undefined') console.error(`[Form ${formIndex}] InitializeSelect2: jQuery not loaded`);
+            if ($.fn.select2 === undefined) console.error(`[Form ${formIndex}] InitializeSelect2: Select2 plugin not loaded on jQuery`);
+            if (selectElement && $(selectElement).data('select2')) console.warn(`[Form ${formIndex}] InitializeSelect2: Select2 already initialized for element (this shouldn't happen if destroy worked):`, selectElement);
         }
     }
 
     // Initialize Select2 on existing forms
     console.log('Initializing Select2 for existing material forms on page load...');
-    container.querySelectorAll('.item-form select[name$="-material"]').forEach(function(select) {
-        initializeSelect2(select);
+    container.querySelectorAll('.item-form select[name$="-material"]').forEach(function(select, index) {
+        initializeSelect2(select, `initial-${index}`);
     });
 
-    // Main category filter change event to update all material Select2 instances
-    const mainCategoryFilter = document.getElementById('{{ form.category_filter.id_for_label }}');
-    if (mainCategoryFilter && typeof $ !== 'undefined' && $.fn.select2) {
-        mainCategoryFilter.addEventListener('change', function() {
-            const selectedCategoryId = this.value;
-            let newAjaxUrl = "{% url 'inventory:material_ajax_search' %}";
-            if (selectedCategoryId) {
-                newAjaxUrl += "?category_id=" + selectedCategoryId;
-            }
-            console.log('Main category filter changed. New AJAX URL for all material selects:', newAjaxUrl);
-            container.querySelectorAll('.item-form select[name$="-material"]').forEach(function(materialSelectElement) {
-                const $materialSelect = $(materialSelectElement);
-                if ($materialSelect.data('select2')) {
-                    $materialSelect.val(null).trigger('change'); // Clear current selection
-                    var S2options = $materialSelect.data('select2').options.options;
-                    S2options.ajax.url = newAjaxUrl;
-                    $materialSelect.select2('destroy').select2(S2options);
-                    console.log('Re-initialized Select2 for:', materialSelectElement, 'with new URL:', newAjaxUrl);
-                } else {
-                     initializeSelect2(materialSelectElement); // Should already be init, but as fallback
-                     console.log('Initialized new Select2 for:', materialSelectElement, 'with new URL:', newAjaxUrl);
-                }
-            });
-        });
-    }
+    // Main category filter change event listener is removed as category_filter itself is removed.
 
     let formTemplateHtml = '';
-    if (emptyFormTemplateDiv && emptyFormTemplateDiv.firstElementChild) { // Ensure it's the .item-form div
+    if (emptyFormTemplateDiv && emptyFormTemplateDiv.firstElementChild) {
         formTemplateHtml = emptyFormTemplateDiv.firstElementChild.outerHTML;
     } else if (container.firstElementChild && container.firstElementChild.classList.contains('item-form')) {
-        formTemplateHtml = container.firstElementChild.outerHTML; // Fallback
+        formTemplateHtml = container.firstElementChild.outerHTML;
     }
-
 
     addButton.addEventListener('click', function() {
         if (!formTemplateHtml) {
@@ -231,50 +218,56 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         let formNum = parseInt(totalFormsInput.value);
-        console.log('Adding new item form, current total forms (next index):', formNum);
+        console.log('Adding new item form, current total forms (next index will be this number):', formNum);
 
         let newFormHtml = formTemplateHtml.replace(/__prefix__/g, formNum);
 
         let tempDiv = document.createElement('div');
         tempDiv.innerHTML = newFormHtml;
-        let newFormElement = tempDiv.firstElementChild;
+        let newFormNode = tempDiv.firstElementChild;
 
-        if (!newFormElement || !newFormElement.classList.contains('item-form')) {
+        if (!newFormNode || !newFormNode.classList.contains('item-form')) {
             console.error("Cloned form structure is invalid. Expected .item-form wrapper. Cloned HTML:", newFormHtml);
             return;
         }
 
-        newFormElement.querySelectorAll('input, select, textarea').forEach(input => {
+        // Clear values from cloned form
+        newFormNode.querySelectorAll('input, select, textarea').forEach(input => {
             if (input.type !== 'hidden' && input.type !== 'button' && input.type !== 'submit' && input.name && !input.name.includes('FORMS')) {
                 if (input.type === 'checkbox' || input.type === 'radio') input.checked = false;
                 else if (input.tagName === 'SELECT') {
-                    if ($(input).data('select2')) $(input).val(null).trigger('change');
-                    else input.selectedIndex = 0;
+                    // For select elements, especially if they were Select2, just reset index or value.
+                    // The initializeSelect2 will handle full setup.
+                    input.selectedIndex = 0;
+                    input.value = ''; // Also try setting value to empty for good measure
                 } else input.value = '';
             }
             if (input.name && input.name.endsWith('-id')) input.value = '';
             if (input.name && input.name.endsWith('-DELETE')) input.checked = false;
         });
 
-        let deleteCheckboxDiv = newFormElement.querySelector('.form-check');
+        let deleteCheckboxDiv = newFormNode.querySelector('.form-check');
         if (deleteCheckboxDiv && deleteCheckboxDiv.querySelector('input[name$="-DELETE"]')) {
-            let buttonContainer = newFormElement.querySelector('.col-md-3.text-end');
+            let buttonContainer = newFormNode.querySelector('.col-md-3.text-end');
             if (buttonContainer) buttonContainer.innerHTML = '<button type="button" class="btn btn-danger btn-sm remove-item-form">Remove</button>';
         } else {
-             let buttonContainer = newFormElement.querySelector('.col-md-3.text-end');
+             let buttonContainer = newFormNode.querySelector('.col-md-3.text-end');
              if(buttonContainer && !buttonContainer.querySelector('.remove-item-form')){
                  buttonContainer.innerHTML = '<button type="button" class="btn btn-danger btn-sm remove-item-form">Remove</button>';
              }
         }
 
-        container.appendChild(newFormElement);
-        totalFormsInput.value = formNum + 1;
+        container.appendChild(newFormNode);
+        totalFormsInput.value = formNum + 1; // Increment for the next form
         console.log('New item form added. New total forms count:', totalFormsInput.value);
 
-        const newMaterialSelect = newFormElement.querySelector('select[name$="-material"]');
+        const newMaterialSelect = newFormNode.querySelector('select[name$="-material"]');
         console.log('Found new material select element for initialization:', newMaterialSelect);
-        initializeSelect2(newMaterialSelect);
-
+        if (newMaterialSelect) {
+            initializeSelect2(newMaterialSelect, formNum.toString()); // Pass current formNum as identifier
+        } else {
+            console.error('Could not find material select in new form row for form index:', formNum);
+        }
         attachRemoveListeners();
     });
 
@@ -289,10 +282,15 @@ document.addEventListener('DOMContentLoaded', function() {
         const itemForm = event.target.closest('.item-form');
         if (itemForm) {
             const deleteInput = itemForm.querySelector('input[name$="-DELETE"]');
+            if (deleteInput && deleteInput.checked) {
+                return;
+            }
             if (deleteInput) {
                 deleteInput.checked = true;
                 itemForm.style.display = 'none';
+                console.log('Marked item for deletion:', itemForm);
             } else {
+                console.log('Removing new item form:', itemForm);
                 itemForm.remove();
             }
         }
