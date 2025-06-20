@@ -1,24 +1,19 @@
 from django import forms
 from decimal import Decimal # Import Decimal
 from django.urls import reverse_lazy
-from django_select2.forms import ModelSelect2Widget, Select2Widget # Add Select2Widget
-from .models import MaterialRequest, Material, StockTransaction, MaterialCategory # Add MaterialCategory
+from django_select2.forms import ModelSelect2Widget, Select2Widget
+from .models import MaterialRequest, Material, StockTransaction, MaterialCategory
 
-# ... (LoginForm and MaterialRequestForm remain) ...
 class LoginForm(forms.Form):
     username = forms.CharField(max_length=100, required=True, widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Username'}))
     password = forms.CharField(widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Password'}), required=True)
 
 class MaterialRequestForm(forms.ModelForm):
-    date_required = forms.DateField(
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-        required=True
-    )
     category_filter = forms.ModelChoiceField(
         queryset=MaterialCategory.objects.all().order_by('name'),
         required=False,
         label="Filter Items by Category (for search below)",
-        widget=Select2Widget(attrs={'data-placeholder': 'All Categories', 'style': 'width: 100%;', 'class': 'form-control'})
+        widget=Select2Widget(attrs={'data-placeholder': 'All Categories', 'style': 'width: 100%;', 'class': 'form-select mb-3'})
     )
     date_required = forms.DateField(
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
@@ -61,8 +56,8 @@ class MaterialForm(forms.ModelForm):
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'sku': forms.TextInput(attrs={'class': 'form-control'}),
             'manufacturer': forms.TextInput(attrs={'class': 'form-control'}),
-            'category': forms.Select(attrs={'class': 'form-select'}), # Standard select, can be Select2Widget if needed
-            'vendor': forms.Select(attrs={'class': 'form-select'}),   # Standard select
+            'category': forms.Select(attrs={'class': 'form-select'}),
+            'vendor': forms.Select(attrs={'class': 'form-select'}),
             'unit_of_measure': forms.TextInput(attrs={'class': 'form-control'}),
             'low_quantity_threshold': forms.NumberInput(attrs={'class': 'form-control'}),
             'image': forms.ClearableFileInput(attrs={'class': 'form-control'}),
@@ -81,10 +76,9 @@ class MaterialForm(forms.ModelForm):
                     "For initial quantity greater than zero, please provide either 'Total Cost for Initial Quantity' or 'Cost Per Unit for Initial Quantity'.",
                     code='missing_initial_cost'
                 )
-        elif initial_quantity is None or initial_quantity == 0: # If quantity is 0, costs should ideally be 0 or None
-            cleaned_data['initial_total_cost'] = Decimal('0.00') # Use Decimal for consistency
+        elif initial_quantity is None or initial_quantity == 0:
+            cleaned_data['initial_total_cost'] = Decimal('0.00')
             cleaned_data['initial_cost_per_unit'] = Decimal('0.00')
-
 
         if initial_total_cost is not None and initial_total_cost < 0:
             self.add_error('initial_total_cost', "Initial total cost cannot be negative.")
@@ -94,64 +88,18 @@ class MaterialForm(forms.ModelForm):
         return cleaned_data
 
 class StockTransactionForm(forms.ModelForm):
-    # Providing one of these should be enough, the model's save method can derive the other.
+    category_filter = forms.ModelChoiceField(
+        queryset=MaterialCategory.objects.all().order_by('name'),
+        required=False,
+        label="Filter by Category",
+        widget=Select2Widget(attrs={'data-placeholder': 'All Categories', 'style': 'width: 100%;', 'class': 'form-select mb-3'})
+    )
     cost_per_unit_at_transaction = forms.DecimalField(
         max_digits=10, decimal_places=2, required=False,
-        label="Filter by Category",
-        widget=Select2Widget(attrs={'data-placeholder': 'All Categories', 'style': 'width: 100%;', 'class': 'form-control'})
+        label="Cost Per Unit (for this transaction)",
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
     )
-    # cost_per_unit_at_transaction and total_cost_of_transaction are already defined above,
-    # and correctly set as required=False.
-    # They will be included in Meta.fields.
-    # No need to redefine them here.
-
-    class Meta:
-        model = StockTransaction
-        fields = [
-            'category_filter', 'material', 'quantity_change',
-            'cost_per_unit_at_transaction', 'total_cost_of_transaction',
-            'notes'
-        ]
-        widgets = {
-            'material': ModelSelect2Widget(
-                model=Material,
-                search_fields=['name__icontains', 'sku__icontains'],
-                attrs={'data-placeholder': 'Search for a material by name or SKU...', 'style': 'width: 100%;'},
-                data_url=reverse_lazy('inventory:material_ajax_search')
-            ),
-            'quantity_change': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Positive value for additions'}),
-            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-        }
-        labels = {
-            'quantity_change': 'Quantity Added/Changed',
-        }
-
-    def __init__(self, *args, **kwargs):
-        self.user = kwargs.pop('user', None)
-        super().__init__(*args, **kwargs)
-        # No longer need to set self.fields['material'].queryset here for Select2 with data_url
-
-    def clean_quantity_change(self):
-        quantity = self.cleaned_data.get('quantity_change')
-        # For this form, assuming it's for RESTOCK or INITIAL, so quantity must be positive.
-        # The model's save method has stronger checks based on transaction_type.
-        if quantity is not None and quantity <= 0:
-            raise forms.ValidationError("Quantity must be positive for a restock.")
-        return quantity
-
-    def clean(self):
-        cleaned_data = super().clean()
-        cost_per_unit = cleaned_data.get('cost_per_unit_at_transaction')
-        total_cost = cleaned_data.get('total_cost_of_transaction')
-
-        if cost_per_unit is None and total_cost is None:
-            raise forms.ValidationError("Please provide either 'Cost Per Unit' or 'Total Cost' for the transaction.")
-        if cost_per_unit is not None and cost_per_unit < 0:
-            self.add_error('cost_per_unit_at_transaction', "Cost per unit cannot be negative.")
-        if total_cost is not None and total_cost < 0:
-            self.add_error('total_cost_of_transaction', "Total cost cannot be negative.")
-
-        return cleaned_data
+    total_cost_of_transaction = forms.DecimalField(
         max_digits=12, decimal_places=2, required=False,
         label="Total Cost (for this transaction)",
         widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
@@ -181,12 +129,9 @@ class StockTransactionForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
-        # No longer need to set self.fields['material'].queryset here for Select2 with data_url
 
     def clean_quantity_change(self):
         quantity = self.cleaned_data.get('quantity_change')
-        # For this form, assuming it's for RESTOCK or INITIAL, so quantity must be positive.
-        # The model's save method has stronger checks based on transaction_type.
         if quantity is not None and quantity <= 0:
             raise forms.ValidationError("Quantity must be positive for a restock.")
         return quantity
