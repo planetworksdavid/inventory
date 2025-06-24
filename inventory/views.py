@@ -287,42 +287,117 @@ def request_complete_view(request, request_id):
         return redirect('inventory:pending_request_list') # Or wherever appropriate
 
     if request.method == 'POST':
-        try:
-            with transaction.atomic():
-                for item in material_request.request_items.all():
-                    if item.material.quantity_on_hand < item.quantity_requested:
-                        messages.error(request, f"Insufficient stock for {item.material.name} (Requested: {item.quantity_requested}, Available: {item.material.quantity_on_hand}). Cannot complete request.")
-                        context = {
-                            'request_to_complete': material_request,
-                            'title': f'Confirm Completion for Request ID: {material_request.id}',
-                            'error_message': f"Insufficient stock for {item.material.name} (Requested: {item.quantity_requested}, Available: {item.material.quantity_on_hand}). Cannot complete request."
-                        }
-                        return render(request, 'inventory/request/request_complete_confirm.html', context)
+        form_errors = {}
+        items_data = [] # To store validated fulfilled quantities
 
-                for item in material_request.request_items.all():
-                    item.material.quantity_on_hand = F('quantity_on_hand') - item.quantity_requested
-                    item.material.save(update_fields=['quantity_on_hand'])
-                    item.fulfilled_quantity = item.quantity_requested
-                    item.save(update_fields=['fulfilled_quantity'])
+        with transaction.atomic(): # Use a transaction for the entire process
+            sid = transaction.savepoint() # Savepoint for potential rollback on validation errors
 
-                material_request.status = MaterialRequest.Status.COMPLETED
-                material_request.updated_at = timezone.now()
-                material_request.save(update_fields=['status', 'updated_at'])
+            for item in material_request.request_items.all():
+                field_name = f'fulfilled_quantity_{item.id}'
+                try:
+                    fulfilled_quantity_str = request.POST.get(field_name)
+                    if fulfilled_quantity_str is None or fulfilled_quantity_str == '':
+                        form_errors[item.id] = "This field is required."
+                        continue
 
-                messages.success(request, f"Request ID {material_request.id} has been marked as completed and stock updated.")
+                    fulfilled_quantity = int(fulfilled_quantity_str)
+
+                    if fulfilled_quantity < 0:
+                        form_errors[item.id] = "Quantity cannot be negative."
+                    elif fulfilled_quantity > item.material.quantity_on_hand:
+                        form_errors[item.id] = f"Cannot fulfill {fulfilled_quantity}. Only {item.material.quantity_on_hand} available."
+                    # Optional: Validate against requested quantity if you don't want to over-fulfill
+                    # For now, we allow fulfilling up to available stock, even if it's less than requested,
+                    # or even 0 if warehouse decides so.
+                    # elif fulfilled_quantity > item.quantity_requested:
+                    #     form_errors[item.id] = f"Cannot fulfill more than requested ({item.quantity_requested})."
+
+                    if item.id not in form_errors:
+                        items_data.append({
+                            'item_instance': item,
+                            'material_instance': item.material,
+                            'fulfilled_quantity': fulfilled_quantity
+                        })
+                except ValueError:
+                    form_errors[item.id] = "Invalid quantity (must be a whole number)."
+                except Exception as e: # Catch unexpected errors during item processing
+                    form_errors[item.id] = f"An unexpected error occurred processing this item: {str(e)}"
+
+
+            if form_errors:
+                transaction.savepoint_rollback(sid) # Rollback changes if any validation errors
+                messages.error(request, "Please correct the errors in the form.")
+                context = {
+                    'request_to_complete': material_request,
+                    'title': f'Confirm Completion for Request ID: {material_request.id}',
+                    'form_errors': form_errors, # Pass errors to template
+                    # Pass back POST data if needed by template, but template already tries to use request.POST
+                }
+                return render(request, 'inventory/request/request_complete_confirm.html', context)
+
+            # If all validations passed and no form_errors
+            all_items_processed_successfully = True
+            for data in items_data:
+                item_instance = data['item_instance']
+                material_instance = data['material_instance']
+                fulfilled_qty = data['fulfilled_quantity']
+
+                try:
+                    # Deduct stock
+                    # Refresh material_instance from DB to ensure quantity_on_hand is current before update
+                    material_to_update = Material.objects.select_for_update().get(pk=material_instance.pk)
+                    if fulfilled_qty > material_to_update.quantity_on_hand:
+                        # This check is technically redundant if initial validation was thorough and no concurrent updates.
+                        # However, it's a safeguard.
+                        form_errors[item_instance.id] = f"Stock changed for {material_to_update.name}. Available: {material_to_update.quantity_on_hand}. Cannot fulfill {fulfilled_qty}."
+                        all_items_processed_successfully = False
+                        break # Exit loop, will trigger rollback
+
+                    material_to_update.quantity_on_hand = F('quantity_on_hand') - fulfilled_qty
+                    material_to_update.save(update_fields=['quantity_on_hand'])
+
+                    # Update fulfilled quantity on the request item
+                    item_instance.fulfilled_quantity = fulfilled_qty
+                    item_instance.save(update_fields=['fulfilled_quantity'])
+
+                except Exception as e_item_update: # Catch errors during DB update for a specific item
+                    # Log e_item_update
+                    form_errors[item_instance.id] = f"Error updating stock for {material_instance.name}: {str(e_item_update)}"
+                    all_items_processed_successfully = False
+                    break # Exit loop, will trigger rollback
+
+            if not all_items_processed_successfully:
+                transaction.savepoint_rollback(sid) # Rollback changes
+                messages.error(request, "Could not complete the request due to errors updating stock or item fulfillment.")
+                context = {
+                    'request_to_complete': material_request,
+                    'title': f'Confirm Completion for Request ID: {material_request.id}',
+                    'form_errors': form_errors,
+                }
+                return render(request, 'inventory/request/request_complete_confirm.html', context)
+
+            # If all items processed successfully
+            material_request.status = MaterialRequest.Status.COMPLETED
+            material_request.updated_at = timezone.now()
+            material_request.save(update_fields=['status', 'updated_at'])
+
+            transaction.savepoint_commit(sid) # Commit the transaction
+            messages.success(request, f"Request ID {material_request.id} has been processed and stock updated based on fulfilled quantities.")
             return redirect('inventory:completed_request_list')
-        except Exception as e:
-            messages.error(request, f"An unexpected error occurred: {e}")
-            context = {
-                'request_to_complete': material_request,
-                'title': f'Confirm Completion for Request ID: {material_request.id}',
-                'error_message': f"An unexpected error occurred: {e}. Please try again."
-            }
-            return render(request, 'inventory/request/request_complete_confirm.html', context)
 
+        # except Exception as e: # General exception for the whole POST processing, outside transaction usually
+        #     # This might catch issues if the transaction itself fails to start/commit/rollback
+        #     # Log error e
+        #     messages.error(request, f"An unexpected error occurred: {str(e)}")
+        #     # Fall through to render the form again, or redirect if appropriate
+        #     # The transaction should have rolled back on unhandled exceptions within its block.
+
+    # GET request or if POST processing falls through without redirecting (e.g. after general error)
     context = {
         'request_to_complete': material_request,
-        'title': f'Confirm Completion for Request ID: {material_request.id}'
+        'title': f'Confirm Completion for Request ID: {material_request.id}',
+        'form_errors': {} # Initialize form_errors for GET requests
     }
     return render(request, 'inventory/request/request_complete_confirm.html', context)
 

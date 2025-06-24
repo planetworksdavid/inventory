@@ -42,29 +42,56 @@
                     {% endif %}
 
                     <h5>Items:</h5>
-                    <ul class="list-group">
-                        {% for item in request_to_complete.request_items.all %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            {{ item.quantity_requested }} x {{ item.material.name }} (SKU: {{ item.material.sku }})
-                            <span class="badge bg-secondary rounded-pill">
-                                On Hand: {{ item.material.quantity_on_hand }}
-                            </span>
-                        </li>
-                        {% endfor %}
-                    </ul>
+                    <form method="post" action="{% url 'inventory:request_complete' request_id=request_to_complete.id %}">
+                        {% csrf_token %}
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Material (SKU)</th>
+                                    <th class="text-end">Requested</th>
+                                    <th class="text-end">Available</th>
+                                    <th class="text-center" style="width: 15%;">Fulfilled Quantity</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in request_to_complete.request_items.all %}
+                                {% with available_stock=item.material.quantity_on_hand %}
+                                {% with default_fulfill_qty=item.quantity_requested|min:available_stock %}
+                                <tr>
+                                    <td>
+                                        {{ item.material.name }} ({{ item.material.sku }})
+                                        {% if item.fulfilled_quantity > 0 and item.fulfilled_quantity < item.quantity_requested %}
+                                            <span class="badge bg-warning text-dark ms-1">Partially Fulfilled Previously</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">{{ item.quantity_requested }}</td>
+                                    <td class="text-end">{{ available_stock }}</td>
+                                    <td class="text-center">
+                                        <input type="number"
+                                               name="fulfilled_quantity_{{ item.id }}"
+                                               class="form-control form-control-sm text-center"
+                                               value="{{ request.POST|get_item:('fulfilled_quantity_'|add:item.id|stringformat:"s")|default:default_fulfill_qty }}"
+                                               min="0"
+                                               max="{{ available_stock }}"
+                                               required>
+                                        {% if form_errors and form_errors|get_item:item.id %}
+                                            <div class="text-danger small mt-1">{{ form_errors|get_item:item.id }}</div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endwith %}
+                                {% endwith %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        <p class="mt-3">Review the quantities above. Clicking "Confirm Completion" will deduct the 'Fulfilled Quantity' for each item from the inventory and mark the request as completed.</p>
+                        <button type="submit" class="btn btn-success">Confirm Completion</button>
+                        <a href="{% url 'inventory:pending_request_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                    </form> {# End of new form replacing the old ul and buttons #}
                 </div>
             </div>
-
-            {% if not error_message or "Insufficient stock" not in error_message|default:"" %}
-            <form method="post" action="{% url 'inventory:request_complete' request_id=request_to_complete.id %}">
-                {% csrf_token %}
-                <p>Are you sure you want to mark this request as completed? This will deduct the item quantities from the inventory.</p>
-                <button type="submit" class="btn btn-success">Confirm Completion</button>
-                <a href="{% url 'inventory:pending_request_list' %}" class="btn btn-outline-secondary">Cancel</a>
-            </form>
-            {% else %}
-                 <a href="{% url 'inventory:pending_request_list' %}" class="btn btn-primary">Return to Pending Requests</a>
-            {% endif %}
+            {# The old logic for showing buttons based on error_message is now integrated into the form display #}
+            {# This section can be simplified or removed if the form is always shown when status is appropriate #}
 
         {% elif request_to_complete.status == 'COMPLETED' %}
              <div class="alert alert-info" role="alert">
