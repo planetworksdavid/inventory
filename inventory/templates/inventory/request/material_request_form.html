@@ -142,11 +142,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const totalFormsInput = document.querySelector('input[name="{{ formset.prefix }}-TOTAL_FORMS"]');
     const emptyFormTemplateDiv = document.getElementById('empty-form-template');
 
-    // The custom initializeSelect2 function has been removed.
-    // We rely on django-select2's own JavaScript (included via formset.media)
-    // to initialize Select2 widgets, including those added dynamically.
-
-    console.log('Relying on django-select2 for Select2 initialization.');
+    console.log('django-select2 event listener setup initiated.');
 
     addButton.addEventListener('click', function() {
         if (!emptyFormTemplateDiv || !emptyFormTemplateDiv.innerHTML.trim()) {
@@ -158,9 +154,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Adding new item form, current total forms (next index):', formNum);
 
         let tempDiv = document.createElement('div');
-        // Replace __prefix__ in the raw template HTML string from emptyFormTemplateDiv
         tempDiv.innerHTML = emptyFormTemplateDiv.innerHTML.replace(/__prefix__/g, formNum);
-
         let newFormNode = tempDiv.firstElementChild;
 
         if (!newFormNode || !newFormNode.classList.contains('item-form')) {
@@ -168,28 +162,20 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Clear input values in the cloned form to prevent carrying over data
         newFormNode.querySelectorAll('input, select, textarea').forEach(input => {
             if (input.type !== 'hidden' && input.type !== 'button' && input.type !== 'submit' && input.name && !input.name.includes('FORMS')) {
                 if (input.type === 'checkbox' || input.type === 'radio') {
                     input.checked = false;
                 } else if (input.tagName === 'SELECT') {
-                    // For select elements, reset selected index.
-                    // django-select2 should re-initialize it.
-                    input.selectedIndex = -1; // Or 0 if you have a placeholder option
-                    // If it was a select2, it might need specific JS to clear, but django-select2 should handle the new one.
+                    input.selectedIndex = -1;
                 } else {
                     input.value = '';
                 }
             }
-            // Ensure hidden ID field is cleared if present (though less common in empty_form)
             if (input.name && input.name.endsWith('-id')) input.value = '';
-            // Ensure DELETE checkbox is not checked
             if (input.name && input.name.endsWith('-DELETE')) input.checked = false;
         });
 
-        // Ensure the "Remove" button is present and not the "Delete" checkbox
-        // (empty_form typically doesn't have instance.pk, so this part might be okay, but good to be sure)
         let deleteCheckboxContainer = newFormNode.querySelector('.form-check input[name$="-DELETE"]');
         if (deleteCheckboxContainer) {
             let buttonContainer = newFormNode.querySelector('.col-md-3.text-end');
@@ -198,21 +184,30 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-
         container.appendChild(newFormNode);
         totalFormsInput.value = formNum + 1;
-        console.log('New item form added. New total forms count:', totalFormsInput.value);
+        console.log('New item form added to DOM. New total forms count:', totalFormsInput.value);
 
-        // After adding the new form to the DOM, django-select2's scripts (from formset.media)
-        // should ideally detect and initialize any new select2 widgets.
-        // If django-select2 has a specific event to trigger re-initialization,
-        // it could be called here, e.g., $(document.body).trigger('django-select2:init');
-        // For now, we assume it handles dynamic additions automatically or through general DOM mutation observers.
-        // Check django-select2 documentation if auto-init fails for dynamically added elements.
+        // Explicitly initialize django-select2 on the new material select element
+        const newMaterialSelect = newFormNode.querySelector('select[name$="-material"]');
+        if (newMaterialSelect) {
+            console.log('Found new material select element:', newMaterialSelect, 'Attempting to initialize django-select2.');
+            if (typeof $ !== 'undefined' && $.fn.djangoSelect2) {
+                try {
+                    $(newMaterialSelect).djangoSelect2(); // Initialize the new select2
+                    console.log('Successfully called .djangoSelect2() on new element:', newMaterialSelect.id);
+                } catch (e) {
+                    console.error('Error calling .djangoSelect2() on new element:', newMaterialSelect.id, e);
+                }
+            } else {
+                console.error('jQuery or $.fn.djangoSelect2 not available for element:', newMaterialSelect.id);
+            }
+        } else {
+            console.error('Could not find material select in new form row for form index:', formNum);
+        }
 
         attachRemoveListeners();
     });
-
     function attachRemoveListeners() {
         container.querySelectorAll('.remove-item-form').forEach(button => {
             // Remove existing listener to prevent duplicates if attachRemoveListeners is called multiple times
