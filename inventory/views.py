@@ -328,11 +328,32 @@ def request_complete_view(request, request_id):
             if form_errors:
                 transaction.savepoint_rollback(sid) # Rollback changes if any validation errors
                 messages.error(request, "Please correct the errors in the form.")
+                # Re-populate items_for_template with submitted values and errors for re-rendering
+                items_with_errors_for_template = []
+                for item in material_request.request_items.all():
+                    field_name = f'fulfilled_quantity_{item.id}'
+                    submitted_value_str = request.POST.get(field_name, '') # Get submitted value, default to empty string
+
+                    # Calculate default_fulfill_qty again for context consistency, though submitted_value takes precedence
+                    available_stock = item.material.quantity_on_hand
+                    default_qty = min(item.quantity_requested, available_stock)
+
+                    items_with_errors_for_template.append({
+                        'instance': item,
+                        'material_name': item.material.name,
+                        'material_sku': item.material.sku,
+                        'quantity_requested': item.quantity_requested,
+                        'available_stock': available_stock,
+                        'default_fulfill_qty': default_qty, # For the 'default' part of the template logic
+                        'submitted_value': submitted_value_str, # Pass the actual string submitted by user
+                        'error_message': form_errors.get(item.id), # Get specific error for this item
+                        'item_id': item.id
+                    })
                 context = {
                     'request_to_complete': material_request,
                     'title': f'Confirm Completion for Request ID: {material_request.id}',
-                    'form_errors': form_errors, # Pass errors to template
-                    # Pass back POST data if needed by template, but template already tries to use request.POST
+                    'items_for_template': items_with_errors_for_template, # Use this enhanced list
+                    'form_errors': form_errors, # Still useful for global form messages if any, or if template uses it directly
                 }
                 return render(request, 'inventory/request/request_complete_confirm.html', context)
 
