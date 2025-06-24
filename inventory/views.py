@@ -394,9 +394,25 @@ def request_complete_view(request, request_id):
         #     # The transaction should have rolled back on unhandled exceptions within its block.
 
     # GET request or if POST processing falls through without redirecting (e.g. after general error)
+    items_for_template = []
+    if material_request: # Ensure material_request is not None
+        for item in material_request.request_items.all():
+            available_stock = item.material.quantity_on_hand
+            default_qty = min(item.quantity_requested, available_stock)
+            items_for_template.append({
+                'instance': item, # The MaterialRequestItem instance
+                'material_name': item.material.name,
+                'material_sku': item.material.sku,
+                'quantity_requested': item.quantity_requested,
+                'available_stock': available_stock,
+                'default_fulfill_qty': default_qty,
+                'item_id': item.id # For constructing field names and error keys
+            })
+
     context = {
-        'request_to_complete': material_request,
-        'title': f'Confirm Completion for Request ID: {material_request.id}',
+        'request_to_complete': material_request, # This is the MaterialRequest instance
+        'items_for_template': items_for_template, # This is the processed list for the template
+        'title': f'Confirm Completion for Request ID: {material_request.id if material_request else "N/A"}',
         'form_errors': {} # Initialize form_errors for GET requests
     }
     return render(request, 'inventory/request/request_complete_confirm.html', context)

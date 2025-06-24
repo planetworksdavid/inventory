@@ -54,33 +54,30 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for item in request_to_complete.request_items.all %}
-                                {% with available_stock=item.material.quantity_on_hand %}
-                                {% with default_fulfill_qty=item.quantity_requested|min:available_stock %}
+                                {% for item_data in items_for_template %}
                                 <tr>
                                     <td>
-                                        {{ item.material.name }} ({{ item.material.sku }})
-                                        {% if item.fulfilled_quantity > 0 and item.fulfilled_quantity < item.quantity_requested %}
+                                        {{ item_data.material_name }} ({{ item_data.material_sku }})
+                                        {# Accessing fulfilled_quantity from the original item instance if needed for badges #}
+                                        {% if item_data.instance.fulfilled_quantity > 0 and item_data.instance.fulfilled_quantity < item_data.quantity_requested %}
                                             <span class="badge bg-warning text-dark ms-1">Partially Fulfilled Previously</span>
                                         {% endif %}
                                     </td>
-                                    <td class="text-end">{{ item.quantity_requested }}</td>
-                                    <td class="text-end">{{ available_stock }}</td>
+                                    <td class="text-end">{{ item_data.quantity_requested }}</td>
+                                    <td class="text-end">{{ item_data.available_stock }}</td>
                                     <td class="text-center">
                                         <input type="number"
-                                               name="fulfilled_quantity_{{ item.id }}"
+                                               name="fulfilled_quantity_{{ item_data.item_id }}"
                                                class="form-control form-control-sm text-center"
-                                               value="{{ request.POST|get_item:('fulfilled_quantity_'|add:item.id|stringformat:"s")|default:default_fulfill_qty }}"
+                                               value="{{ request.POST|get_item:('fulfilled_quantity_'|add:item_data.item_id|stringformat:"s")|default:item_data.default_fulfill_qty }}"
                                                min="0"
-                                               max="{{ available_stock }}"
+                                               max="{{ item_data.available_stock }}"
                                                required>
-                                        {% if form_errors and form_errors|get_item:item.id %}
-                                            <div class="text-danger small mt-1">{{ form_errors|get_item:item.id }}</div>
+                                        {% if form_errors and form_errors|get_item:item_data.item_id %}
+                                            <div class="text-danger small mt-1">{{ form_errors|get_item:item_data.item_id }}</div>
                                         {% endif %}
                                     </td>
                                 </tr>
-                                {% endwith %}
-                                {% endwith %}
                                 {% endfor %}
                             </tbody>
                         </table>
