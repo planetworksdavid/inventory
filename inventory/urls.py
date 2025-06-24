@@ -29,4 +29,7 @@ urlpatterns = [
     path('warehouse/materials/restock/', views.material_restock_view, name='material_restock'),
     # AJAX Search URL for Select2
     path('ajax/material_search/', views.MaterialAjaxSearch.as_view(), name='material_ajax_search'),
+
+    # AJAX for fetching material stock
+    path('material/<int:material_id>/stock/', views.get_material_stock_view, name='get_material_stock'),
 ]

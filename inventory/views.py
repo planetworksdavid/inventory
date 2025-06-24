@@ -7,7 +7,7 @@ from django.db import transaction # To ensure atomicity
 from django.db.models import Q, F # Import F object
 from django.contrib import messages # For user feedback
 from django.utils import timezone # Ensure timezone is imported
-from django.http import HttpResponseForbidden # For access control
+from django.http import HttpResponseForbidden, JsonResponse # For access control & JSON
 from django_select2.views import AutoResponseView # For select2 AJAX view
 from django_select2.forms import ModelSelect2Widget # For select2 form widget
 from django.urls import reverse_lazy # For data_url in widget
@@ -388,6 +388,20 @@ def material_create_view(request):
         # 'material_instance' is not passed for create view, so template condition will work
     }
     return render(request, 'inventory/material/material_form.html', context)
+
+@login_required # Ensure user is logged in, specifics of role can be debated for this utility view
+def get_material_stock_view(request, material_id):
+    if not request.user.is_authenticated: # Redundant if @login_required is used, but good for clarity
+        return JsonResponse({'error': 'Authentication required.'}, status=401)
+
+    try:
+        material = Material.objects.get(pk=material_id)
+        return JsonResponse({'quantity_on_hand': material.quantity_on_hand})
+    except Material.DoesNotExist:
+        return JsonResponse({'error': 'Material not found.'}, status=404)
+    except Exception as e: # Catch any other unexpected errors
+        # Log the error e
+        return JsonResponse({'error': 'An unexpected error occurred.'}, status=500)
 
 
 # AJAX view for material search with django-select2

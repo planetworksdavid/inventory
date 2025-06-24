@@ -62,6 +62,9 @@
                         <div class="col-md-5">
                             <label for="{{ item_form.material.id_for_label }}" class="form-label">{{ item_form.material.label_tag }}</label>
                             {{ item_form.material }}
+                            <div class="form-text current-stock-display" style="min-height: 20px;">
+                                <!-- Stock will be displayed here by JavaScript -->
+                            </div>
                             {% if item_form.material.errors %}
                                 <div class="invalid-feedback d-block">{{ item_form.material.errors|join:", " }}</div>
                             {% endif %}
@@ -110,6 +113,9 @@
             <div class="col-md-5">
                 <label for="{{ formset.empty_form.material.id_for_label }}" class="form-label">{{ formset.empty_form.material.label_tag }}</label>
                 {{ formset.empty_form.material }}
+                <div class="form-text current-stock-display" style="min-height: 20px;">
+                    <!-- Stock will be displayed here by JavaScript -->
+                </div>
                 {% if formset.empty_form.material.errors %}
                     <div class="invalid-feedback d-block">{{ formset.empty_form.material.errors|join:", " }}</div>
                 {% endif %}
@@ -143,6 +149,95 @@ document.addEventListener('DOMContentLoaded', function() {
     const emptyFormTemplateDiv = document.getElementById('empty-form-template');
 
     console.log('django-select2 event listener setup initiated.');
+
+    // --- Function to fetch and display stock ---
+    function fetchAndDisplayStock(materialSelectElement) {
+        const selectedMaterialId = materialSelectElement.value;
+        const itemForm = materialSelectElement.closest('.item-form');
+        if (!itemForm) {
+            console.error('Could not find parent .item-form for select:', materialSelectElement);
+            return;
+        }
+        const stockDisplayElement = itemForm.querySelector('.current-stock-display');
+        if (!stockDisplayElement) {
+            console.error('Could not find .current-stock-display in form row:', itemForm);
+            return;
+        }
+
+        if (selectedMaterialId) {
+            // Construct the URL carefully. Using a placeholder and replacing.
+            // Ensure `get_material_stock` URL name is correct and accessible.
+            // The URL tag should ideally be available to JS, e.g., via a data attribute or a global JS var.
+            // For simplicity here, constructing manually, assuming '/inventory/' prefix.
+            // A more robust way: const urlTemplate = "{% url 'inventory:get_material_stock' material_id=0 %}".replace('0', selectedMaterialId);
+            const url = `/inventory/material/${selectedMaterialId}/stock/`;
+            console.log(`Fetching stock for material ID ${selectedMaterialId} from ${url}`);
+
+            stockDisplayElement.textContent = 'Loading stock...'; // Show loading indicator
+
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Network response was not ok: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.error) {
+                        stockDisplayElement.textContent = `Error: ${data.error}`;
+                        console.error('Error fetching stock:', data.error);
+                    } else if (typeof data.quantity_on_hand !== 'undefined') {
+                        stockDisplayElement.textContent = `Stock on hand: ${data.quantity_on_hand}`;
+                    } else {
+                        stockDisplayElement.textContent = 'Stock data not available.';
+                         console.warn('Quantity on hand not found in response data:', data);
+                    }
+                })
+                .catch(error => {
+                    stockDisplayElement.textContent = 'Failed to load stock.';
+                    console.error('Error fetching stock:', error);
+                });
+        } else {
+            stockDisplayElement.textContent = ''; // Clear stock display if no material selected
+        }
+    }
+
+    // --- Function to setup event listeners for a given select element ---
+    function setupMaterialSelectListeners(selectElement) {
+        // Using jQuery for select2 event handling as django-select2 is a jQuery plugin
+        if (typeof $ !== 'undefined') {
+            $(selectElement).on('change.stockDisplay', function() { // namespaced event
+                console.log('Material selection changed for:', this);
+                fetchAndDisplayStock(this);
+            });
+            console.log('Attached stock display change listener to:', selectElement.id || selectElement.name);
+        } else {
+            console.error("jQuery not available to attach change listener for stock display.");
+        }
+    }
+
+    // --- Attach listeners to initially loaded material select elements ---
+    container.querySelectorAll('select[name$="-material"]').forEach(selectElement => {
+        // Check if it's already a select2 (it should be)
+        if (typeof $ !== 'undefined' && $(selectElement).data('select2')) {
+            setupMaterialSelectListeners(selectElement);
+        } else {
+            // If not yet select2, wait for django-select2 to initialize it.
+            // This might require a more robust way to hook after django-select2 init.
+            // For now, assume they are initialized quickly or use a small timeout as a fallback.
+            // A MutationObserver on attributes might be more robust if django-select2 adds a class/attribute upon init.
+            console.warn("Initial select not yet a select2, attempting to attach listener anyway or might need delay:", selectElement.id);
+            // Try attaching anyway, or defer
+             setTimeout(() => { // Small delay to allow select2 to potentially initialize
+                if (typeof $ !== 'undefined' && $(selectElement).data('select2')) {
+                     setupMaterialSelectListeners(selectElement);
+                } else {
+                    console.error("Initial select still not select2 after delay:", selectElement.id);
+                }
+            }, 500);
+        }
+    });
+
 
     addButton.addEventListener('click', function() {
         if (!emptyFormTemplateDiv || !emptyFormTemplateDiv.innerHTML.trim()) {
@@ -191,11 +286,13 @@ document.addEventListener('DOMContentLoaded', function() {
         // Explicitly initialize django-select2 on the new material select element
         const newMaterialSelect = newFormNode.querySelector('select[name$="-material"]');
         if (newMaterialSelect) {
-            console.log('Found new material select element:', newMaterialSelect, 'Attempting to initialize django-select2.');
+            console.log('Found new material select element:', newMaterialSelect.id, 'Attempting to initialize django-select2.');
             if (typeof $ !== 'undefined' && $.fn.djangoSelect2) {
                 try {
                     $(newMaterialSelect).djangoSelect2(); // Initialize the new select2
                     console.log('Successfully called .djangoSelect2() on new element:', newMaterialSelect.id);
+                    // After initializing, attach the change listener for stock display
+                    setupMaterialSelectListeners(newMaterialSelect);
                 } catch (e) {
                     console.error('Error calling .djangoSelect2() on new element:', newMaterialSelect.id, e);
                 }
