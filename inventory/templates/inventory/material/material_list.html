@@ -9,10 +9,50 @@
     <h2>{{ title }}</h2>
 
     <!-- Search Form -->
-    <form method="get" action="{% url 'inventory:material_list' %}" class="mb-3">
-        <div class="input-group">
-            <input type="text" name="q" class="form-control" placeholder="Search for materials..." value="{{ search_query }}">
-            <button class="btn btn-outline-primary" type="submit">Search</button>
+    <form method="get" action="{% url 'inventory:material_list' %}" class="mb-4">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-12">
+                <label for="searchQuery" class="form-label visually-hidden">Search Term</label>
+                <input type="text" name="q" id="searchQuery" class="form-control" placeholder="Search by name, SKU, description..." value="{{ search_query }}">
+            </div>
+
+            <div class="col-md-4">
+                <label for="categoriesFilter" class="form-label">Category</label>
+                <select name="categories" id="categoriesFilter" class="form-select select2-multiple" multiple="multiple">
+                    {% for category in all_categories %}
+                        <option value="{{ category.id }}" {% if category.id in selected_category_ids %}selected{% endif %}>
+                            {{ category.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-4">
+                <label for="vendorsFilter" class="form-label">Vendor</label>
+                <select name="vendors" id="vendorsFilter" class="form-select select2-multiple" multiple="multiple">
+                    {% for vendor in all_vendors %}
+                        <option value="{{ vendor.id }}" {% if vendor.id in selected_vendor_ids %}selected{% endif %}>
+                            {{ vendor.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-4">
+                <label for="manufacturersFilter" class="form-label">Manufacturer</label>
+                <select name="manufacturers" id="manufacturersFilter" class="form-select select2-multiple" multiple="multiple">
+                    {% for manufacturer_name in all_manufacturers %}
+                        <option value="{{ manufacturer_name }}" {% if manufacturer_name in selected_manufacturers %}selected{% endif %}>
+                            {{ manufacturer_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-12 text-end">
+                <a href="{% url 'inventory:material_list' %}" class="btn btn-outline-secondary me-2">Clear Filters</a>
+                <button class="btn btn-primary" type="submit">Apply Filters & Search</button>
+            </div>
         </div>
     </form>
 
@@ -73,4 +113,18 @@
     {% endif %}
 
 </div>
+
+{% block additional_scripts %}
+{{ super }} {# Ensures scripts from base.html (like jQuery, Bootstrap, form.media) are included #}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+$(document).ready(function() {
+    $('.select2-multiple').select2({
+        placeholder: "Select options",
+        allowClear: true,
+        width: '100%' // Ensure Select2 takes full width of its container
+    });
+});
+</script>
 {% endblock %}

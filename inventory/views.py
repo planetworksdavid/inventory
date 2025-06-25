@@ -54,13 +54,54 @@ def logout_view(request):
 @login_required
 def material_list_view(request):
     query = request.GET.get('q')
+    selected_category_ids = request.GET.getlist('categories')
+    selected_vendor_ids = request.GET.getlist('vendors')
+    selected_manufacturers = request.GET.getlist('manufacturers')
+
     materials = Material.objects.select_related('category', 'vendor').all()
+
+    # Apply text search filter
     if query:
-        search_filters = Q(name__icontains=query) | Q(sku__icontains=query) | \
-                         Q(manufacturer__icontains=query) | Q(category__name__icontains=query) | \
-                         Q(vendor__name__icontains=query) | Q(unit_of_measure__icontains=query)
+        search_filters = (
+            Q(name__icontains=query) |
+            Q(sku__icontains=query) |
+            Q(manufacturer__icontains=query) | # Keep manufacturer in text search
+            Q(category__name__icontains=query) | # Keep category name in text search
+            Q(vendor__name__icontains=query) |   # Keep vendor name in text search
+            Q(unit_of_measure__icontains=query)
+        )
         materials = materials.filter(search_filters)
-    context = {'materials': materials, 'search_query': query or "", 'title': 'Material Inventory'}
+
+    # Apply category filter
+    if selected_category_ids:
+        materials = materials.filter(category__id__in=selected_category_ids)
+
+    # Apply vendor filter
+    if selected_vendor_ids:
+        materials = materials.filter(vendor__id__in=selected_vendor_ids)
+
+    # Apply manufacturer filter
+    if selected_manufacturers:
+        materials = materials.filter(manufacturer__in=selected_manufacturers)
+
+    # Data for filter dropdowns
+    all_categories = MaterialCategory.objects.all().order_by('name')
+    all_vendors = Vendor.objects.all().order_by('name')
+    # Get distinct manufacturers from the current state of the DB, not just filtered results
+    all_manufacturers = Material.objects.values_list('manufacturer', flat=True).distinct().order_by('manufacturer')
+    all_manufacturers = [m for m in all_manufacturers if m] # Remove empty/null manufacturers if any
+
+    context = {
+        'materials': materials,
+        'search_query': query or "",
+        'all_categories': all_categories,
+        'selected_category_ids': [int(cid) for cid in selected_category_ids if cid.isdigit()], # Ensure IDs are int for template
+        'all_vendors': all_vendors,
+        'selected_vendor_ids': [int(vid) for vid in selected_vendor_ids if vid.isdigit()], # Ensure IDs are int for template
+        'all_manufacturers': all_manufacturers,
+        'selected_manufacturers': selected_manufacturers,
+        'title': 'Material Inventory'
+    }
     return render(request, 'inventory/material/material_list.html', context)
 
 # Material Requests (Crew)
