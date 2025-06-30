@@ -1,0 +1,26 @@
+{% extends "inventory/base.html" %}
+
+{% block title %}
+  Registration Pending Approval
+{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <div class="card text-center">
+        <div class="card-header">
+          <h4>Registration Submitted</h4>
+        </div>
+        <div class="card-body">
+          <p class="lead">Thank you for registering!</p>
+          <p>Your account has been created successfully and is now awaiting approval from an administrator.</p>
+          <p>You will be notified once your account is activated. If you have any questions, please contact support.</p>
+          <hr>
+          <a href="{% url 'inventory:login' %}" class="btn btn-primary">Back to Login</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

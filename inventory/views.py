@@ -542,6 +542,46 @@ def material_create_view(request):
     }
     return render(request, 'inventory/material/material_form.html', context)
 
+
+# User Signup View
+def signup_view(request):
+    if request.user.is_authenticated:
+        return redirect('inventory:material_list') # Or wherever authenticated users should go
+
+    if request.method == 'POST':
+        form = SignupForm(request.POST)
+        if form.is_valid():
+            try:
+                with transaction.atomic(): # Ensure user and profile are created together
+                    user = User.objects.create_user(
+                        username=form.cleaned_data['username'],
+                        email=form.cleaned_data['email'],
+                        password=form.cleaned_data['password'],
+                        is_active=False  # Important: User is inactive until admin approval
+                    )
+                    UserProfile.objects.create(
+                        user=user,
+                        requested_role=form.cleaned_data['requested_role']
+                    )
+
+                # Optional: Send email to admin about new signup
+                # Optional: Send email to user about pending approval
+
+                messages.success(request, "Registration successful! Your account is awaiting admin approval.")
+                return redirect('inventory:login') # Or a dedicated 'pending_approval' page
+            except Exception as e:
+                # Log the error e
+                messages.error(request, f"An unexpected error occurred during registration: {e}. Please try again.")
+                # Fall through to render form again with this error if not caught by form validation
+    else:
+        form = SignupForm()
+
+    context = {
+        'form': form,
+        'title': 'Sign Up'
+    }
+    return render(request, 'inventory/auth/signup.html', context)
+
 @login_required # Ensure user is logged in, specifics of role can be debated for this utility view
 def get_material_stock_view(request, material_id):
     if not request.user.is_authenticated: # Redundant if @login_required is used, but good for clarity

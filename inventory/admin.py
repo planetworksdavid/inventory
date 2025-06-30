@@ -1,6 +1,45 @@
 from django.contrib import admin
-from .models import MaterialCategory, Vendor, Material, MaterialRequest, MaterialRequestItem
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.models import User # Import User
+from .models import (
+    MaterialCategory, Vendor, Material,
+    MaterialRequest, MaterialRequestItem,
+    UserProfile # Import UserProfile
+)
+from django.utils import timezone # For admin actions if needed
 
+# --- User Admin Customization ---
+# Define an inline admin descriptor for UserProfile
+class UserProfileInline(admin.StackedInline): # Or admin.TabularInline for a more compact view
+    model = UserProfile
+    can_delete = False # Typically, you don't want to delete the profile when deleting a user from here
+    verbose_name_plural = 'User Profile & Role Request'
+    # Specify fields to display in the inline form; 'requested_role' is key
+    fields = ('requested_role', 'created_at', 'updated_at')
+    readonly_fields = ('created_at', 'updated_at') # Timestamps are usually read-only
+
+# Define a new User admin by extending the base UserAdmin
+class CustomUserAdmin(BaseUserAdmin):
+    inlines = (UserProfileInline,)
+    list_display = ('username', 'email', 'first_name', 'last_name', 'is_active', 'is_staff', 'get_requested_role')
+    list_filter = BaseUserAdmin.list_filter + ('is_active', 'profile__requested_role') # Filter by active status & requested role
+
+    @admin.display(description='Requested Role', ordering='profile__requested_role')
+    def get_requested_role(self, obj):
+        # obj is a User instance
+        if hasattr(obj, 'profile') and obj.profile and obj.profile.requested_role:
+            return obj.profile.get_requested_role_display()
+        return None # Or '-' or 'Not Requested'
+
+    # To make users searchable by their requested role (optional)
+    # search_fields = BaseUserAdmin.search_fields + ('profile__requested_role',)
+
+# Unregister the original User admin if it's already registered by Django
+admin.site.unregister(User)
+# Register the User model with your custom admin
+admin.site.register(User, CustomUserAdmin)
+
+# --- Other Model Admins ---
 @admin.register(MaterialCategory)
 class MaterialCategoryAdmin(admin.ModelAdmin):
     list_display = ('name', 'description')

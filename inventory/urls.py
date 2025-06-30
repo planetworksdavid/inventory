@@ -7,6 +7,7 @@ urlpatterns = [
     # Authentication
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
+    path('signup/', views.signup_view, name='signup'),
 
     # Inventory
     path('', views.material_list_view, name='material_list'), # Assuming root of app is material list

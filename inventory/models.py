@@ -6,6 +6,32 @@ from django.conf import settings # For ForeignKey to User
 from decimal import Decimal # For cost calculations
 from django.utils import timezone # Import timezone
 
+# User Profile to store requested role and other user-specific, non-auth data
+class UserProfile(models.Model):
+    ROLE_CREW = 'CREW'
+    ROLE_WAREHOUSE_STAFF = 'WAREHOUSE_STAFF'
+    REQUESTED_ROLE_CHOICES = [
+        (ROLE_CREW, 'Crew'),
+        (ROLE_WAREHOUSE_STAFF, 'Warehouse Staff'),
+    ]
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, # Use settings.AUTH_USER_MODEL for flexibility
+        on_delete=models.CASCADE,
+        related_name='profile'
+    )
+    requested_role = models.CharField(
+        max_length=20,
+        choices=REQUESTED_ROLE_CHOICES,
+        null=True, # Allow null if a profile is created before a role is requested
+        blank=True # Allow blank in forms if applicable, or if set programmatically
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.username}'s Profile (Requested: {self.get_requested_role_display() or 'N/A'})"
+
 class MaterialCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True, null=True)

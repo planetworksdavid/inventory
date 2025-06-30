@@ -1,0 +1,89 @@
+{% extends "inventory/base.html" %}
+
+{% block title %}
+  {{ title|default:"Sign Up" }}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header">
+          <h4>{{ title|default:"Create Account" }}</h4>
+        </div>
+        <div class="card-body">
+          <form method="post" novalidate>
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+              <div class="alert alert-danger">
+                {% for error in form.non_field_errors %}
+                  <p>{{ error }}</p>
+                {% endfor %}
+              </div>
+            {% endif %}
+
+            <div class="mb-3">
+              <label for="{{ form.username.id_for_label }}" class="form-label">{{ form.username.label_tag }}</label>
+              {{ form.username }}
+              {% if form.username.errors %}
+                <div class="invalid-feedback d-block">
+                  {% for error in form.username.errors %}{{ error }}{% endfor %}
+                </div>
+              {% endif %}
+            </div>
+
+            <div class="mb-3">
+              <label for="{{ form.email.id_for_label }}" class="form-label">{{ form.email.label_tag }}</label>
+              {{ form.email }}
+              {% if form.email.errors %}
+                <div class="invalid-feedback d-block">
+                  {% for error in form.email.errors %}{{ error }}{% endfor %}
+                </div>
+              {% endif %}
+            </div>
+
+            <div class="mb-3">
+              <label for="{{ form.password.id_for_label }}" class="form-label">{{ form.password.label_tag }}</label>
+              {{ form.password }}
+              {% if form.password.errors %}
+                <div class="invalid-feedback d-block">
+                  {% for error in form.password.errors %}{{ error }}{% endfor %}
+                </div>
+              {% endif %}
+            </div>
+
+            <div class="mb-3">
+              <label for="{{ form.password_confirmation.id_for_label }}" class="form-label">{{ form.password_confirmation.label_tag }}</label>
+              {{ form.password_confirmation }}
+              {% if form.password_confirmation.errors %}
+                <div class="invalid-feedback d-block">
+                  {% for error in form.password_confirmation.errors %}{{ error }}{% endfor %}
+                </div>
+              {% endif %}
+            </div>
+
+            <div class="mb-3">
+              <label for="{{ form.requested_role.id_for_label }}" class="form-label">{{ form.requested_role.label_tag }}</label>
+              {{ form.requested_role }}
+              {% if form.requested_role.errors %}
+                <div class="invalid-feedback d-block">
+                  {% for error in form.requested_role.errors %}{{ error }}{% endfor %}
+                </div>
+              {% endif %}
+            </div>
+
+            <div class="d-grid">
+              <button type="submit" class="btn btn-primary">Sign Up</button>
+            </div>
+          </form>
+        </div>
+        <div class="card-footer text-center">
+          <small>Already have an account? <a href="{% url 'inventory:login' %}">Log In</a></small>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

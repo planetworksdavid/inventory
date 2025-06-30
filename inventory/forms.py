@@ -81,6 +81,55 @@ class MaterialForm(forms.ModelForm):
 
         return cleaned_data
 
+from django.contrib.auth.models import User
+from .models import UserProfile # Import UserProfile
+
+class SignupForm(forms.Form):
+    username = forms.CharField(
+        max_length=150,
+        required=True,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Username'})
+    )
+    email = forms.EmailField(
+        required=True,
+        widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Email Address'})
+    )
+    password = forms.CharField(
+        widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Password'}),
+        required=True,
+        min_length=8 # Example: enforce minimum password length
+    )
+    password_confirmation = forms.CharField(
+        widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Confirm Password'}),
+        required=True,
+        label="Confirm Password"
+    )
+    requested_role = forms.ChoiceField(
+        choices=UserProfile.REQUESTED_ROLE_CHOICES,
+        required=True,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="I want to register as a"
+    )
+
+    def clean_username(self):
+        username = self.cleaned_data.get('username')
+        if User.objects.filter(username=username).exists():
+            raise forms.ValidationError("A user with this username already exists.")
+        return username
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if User.objects.filter(email=email).exists():
+            raise forms.ValidationError("This email address is already in use.")
+        return email
+
+    def clean_password_confirmation(self):
+        password = self.cleaned_data.get('password')
+        password_confirmation = self.cleaned_data.get('password_confirmation')
+        if password and password_confirmation and password != password_confirmation:
+            raise forms.ValidationError("Passwords do not match.")
+        return password_confirmation
+
 class StockTransactionForm(forms.ModelForm):
     cost_per_unit_at_transaction = forms.DecimalField(
         max_digits=10, decimal_places=2, required=False,
