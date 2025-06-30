@@ -13,8 +13,16 @@ from django_select2.forms import ModelSelect2Widget # For select2 form widget
 from django.urls import reverse_lazy # For data_url in widget
 from django import forms # For forms.NumberInput
 
-from .forms import LoginForm, MaterialRequestForm, MaterialForm, StockTransactionForm
-from .models import Material, MaterialRequest, MaterialRequestItem, MaterialCategory, Vendor, StockTransaction
+# Import User model
+from django.contrib.auth.models import User
+# Import forms
+from .forms import LoginForm, MaterialRequestForm, MaterialForm, StockTransactionForm, SignupForm
+# Import models
+from .models import (
+    Material, MaterialRequest, MaterialRequestItem, MaterialCategory, Vendor, StockTransaction,
+    UserProfile
+)
+
 
 # Helper functions for role checks
 def is_crew_member(user):
